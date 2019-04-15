@@ -1,0 +1,288 @@
+---
+title: "Newhart ADPCA 2019 v1"
+author: "Kathryn Newhart"
+date: "December 23, 2018"
+output: word_document
+---
+This version of the document includes time to event caluclations. 
+
+# Case studies
+To prepare workspace to run case studies:
+* Load ADPCA package
+* Set parameters 
+
+Steps for each case study:
+1. Declare case study paramters
+2. Compile & clean raw data
+3. Train ADPCA model
+4. Test ADPCA model
+5. Calculate fault detection statistics
+6. Summarize results
+
+Required packages: 
++ ADPCA
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+rm(list=ls())
+# devtools::install_github("KNewhart/ADPCA")
+library(ADPCA)
+```
+
+General ADPCA package parameters:
+```{r}
+# Where results files should be saved
+wd <- "C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R"
+setwd(wd)
+# Alpha value for statistical analysis
+alphaN <- 0.01 
+# Number of successive OC observations to trigger an alarm
+faultsToTriggerAlarm <- 5 
+## Data processing parameters##
+# TODO: Location of the KNewhart/MP_SBMBR_data github repository
+dataLocation <- "C:/Users/Kate Newhart/odrive/Mines/Data/MP_SBMBR_data/"
+# Variables from raw data that will be used to define the state of the bioreactor (BR) and the membrane bioreactor (MT, membrane tank). 
+stateVarsBR <- c("BIO_1\\CURRENT_PHASE",
+                 "BIO_2\\CURRENT_PHASE",
+                 "BIO_BLOWER_1\\RUNNING",
+                 "BIO_BLOWER_2\\RUNNING")
+stateVarsMT <- c("MBR_1\\CURRENT_MODE",
+                 "MBR_2\\CURRENT_MODE",
+                 "MBR\\CURRENT_FLUX_MODE",
+                 "MBR_1\\CURRENT_STATE",
+                 "MBR_2\\CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT")
+# Process variables from raw data that will be used for the BR and MT. 
+varsBR <- c("BIO_1\\CURRENT_PHASE",
+            "BIO_1\\DO\\PROCESS_VALUE",
+            "BIO_2\\CURRENT_PHASE",
+            "BIO_2\\DO\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\RUNNING",
+            "BIO_BLOWER_2\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_2\\RUNNING",
+            "SEWAGE\\FLOW\\PROCESS_VALUE",
+            "SEWAGE\\LEVEL\\PROCESS_VALUE",
+            "AMBIENT_TEMP\\PROCESS_VALUE",
+            "BIO_1\\LEVEL\\PROCESS_VALUE",
+            "BIO_1\\TEMPERATURE\\PROCESS_VALUE",
+            "BIO_2\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TEMPERATURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE")
+varsMT <- c("MBR_1\\CURRENT_MODE",
+            "MBR_1\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_1\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR_2\\CURRENT_MODE",
+            "MBR_2\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_2\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_1",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_2",
+            "MBR\\CURRENT_FLUX_MODE",
+            "MBR_1\\CURRENT_STATE",
+            "MBR_2\\CURRENT_STATE",
+            "MBR_1\\TRANS_PRESS\\PROCESS_VALUE",
+            "MBR_2\\TRANS_PRESS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_1",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_2",
+            "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+            "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\DO\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "PERMEATE_TANK\\CONDUCTIVITY\\PROCESS_VALUE",
+            "PERMEATE_TANK\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TSS\\PROCESS_VALUE",
+            "BIO_1\\TSS\\PROCESS_VALUE",
+            "MBR_1\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_1\\LEVEL\\PROCESS_VALUE",
+            "MBR_2\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_2\\LEVEL\\PROCESS_VALUE",
+            "PERMEATE_TANK\\TURBIDITY\\PROCESS_VALUE")
+```
+
+
+## Sewage pump: thermal shutdown (Jan. 29, 2018)
+* What: Raw sewage pump shut down
+* Why: Clog in septic tank influent, causing the sewage level to drop. This exposed the pump, causing it to overheat/shutdown
+* When: Jan 29-30
+Variables affected: Sewage Level, Bioreactor Level, Bioreactor DO, Bioreactor Blower Flow,
+* SB-MBR Alarm: When bioreactor level dropped below 5 ft
+* Notes: System was temporarily shut down on Jan 25th
+* Results: No faults detected in the membrane sub-system
+
+### Declare ADPCA parameters
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+keyword <- "sewage_pump_shutdown"
+## ADPCA parameters ##
+# Date to be evaluated with ADPCA model
+testingDay <- as.Date("2018 01 29", format = "%Y %m %d")
+# Number of days to train on
+rollingWindowDays <- 5
+# Number of times model is updated 
+updateDays <- rollingWindowDays
+# Total number of days to be compiled
+nDays <- rollingWindowDays + updateDays
+```
+
+### Steps 2-4
+```{r message=FALSE, warning=FALSE}
+source("case_study_sop.R")
+```
+
+### Calculate fault detection statistics
+```{r message=FALSE}
+trueFaultTime <- as.POSIXct("2018-01-29 09:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 13:47 MST")
+SSAlarmTime <- index(alarmDataSS)[which(alarmDataSS$Alarm != 0)[1]]
+BRAlarmTime <- index(alarmDataBR)[which(alarmDataBR$Alarm != 0)[1]]
+# Single vs Multistate
+ss_alarm <- as.numeric(trueAlarmTime - SSAlarmTime)
+ms_alarm <- as.numeric(trueAlarmTime - BRAlarmTime)
+# SPE Single
+spe_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(1,3))[1]])
+# T2 Single
+t2_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(2,3))[1]])
+# SPE Multi
+spe_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(1,3)))[1]])
+# T2 Multi
+t2_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(2,3)))[1]])
+
+# ADPCA Statistics Ranking
+adpca_statistics <- c(spe_ss_alarm, t2_ss_alarm, spe_ms_alarm, t2_ms_alarm)
+adpca_statistics_labels <- c("SPE SS", "T2 SS", "SPE MS", "T2 MS")
+# adpca_statistics_labels[match(sort(adpca_statistics), adpca_statistics)]
+
+# Summary
+summary_statistics <- as.data.frame(adpca_statistics, row.names = adpca_statistics_labels)
+colnames(summary_statistics) <- "Sewage Pump"
+# knitr::kable(summary_statistics, digits = 1, caption = "Time to detection (hours)")
+
+# Plot everything
+source("case_study_plot.R")
+```
+
+
+## RAS Pump: Clog (Jan. 25, 2018)
+* What: Clog slowly developed in RAS pump (between bioreactors and membrane tanks)
+* When: Decline (appears) to start on January 5th - January 25th
+* Why: Hair clog? Foam? Not sure. 
+* Variables: MBR Influent Flow
+* Results: Flow declined so slowly prior to the event occuring that it was the corrected process behavior that was detected as OC. 
+
+### Declare ADPCA parameters
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+## ADPCA parameters ##
+keyword <- "RAS_pump_clog"
+setwd("C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R")
+# Date to be evaluated with ADPCA model
+testingDay <- as.Date("2018 01 25", format = "%Y %m %d")
+# Number of days to train on
+rollingWindowDays <- 5
+# Number of times model is updated 
+updateDays <- 2
+# Total number of days to be compiled
+nDays <- rollingWindowDays + updateDays
+
+```
+
+### Steps 2-4
+```{r message=FALSE, warning=FALSE}
+source("case_study_sop.R")
+```
+
+### Calculate fault detection statistics
+```{r}
+
+trueAlarmTime <- as.POSIXct("2018-01-30 04:43:58 MST")
+SSAlarmTime <- index(alarmDataSS)[which(alarmDataSS$Alarm != 0)[1]]
+BRAlarmTime <- index(alarmDataBR)[which(alarmDataBR$Alarm != 0)[1]]
+# Single vs Multistate
+ss_alarm <- as.numeric(trueAlarmTime - SSAlarmTime)
+ms_alarm <- as.numeric(trueAlarmTime - BRAlarmTime)
+# SPE Single
+spe_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(1,3))[1]])
+# T2 Single
+t2_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(2,3))[1]])
+# SPE Multi
+spe_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(1,3)))[1]])
+# T2 Multi
+t2_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(2,3)))[1]])
+
+# ADPCA Statistics Ranking
+adpca_statistics <- c(spe_ss_alarm, t2_ss_alarm, spe_ms_alarm, t2_ms_alarm)
+adpca_statistics_labels <- c("SPE SS", "T2 SS", "SPE MS", "T2 MS")
+# adpca_statistics_labels[match(sort(adpca_statistics), adpca_statistics)]
+
+# Summary
+summary_statistics <- cbind(summary_statistics, as.data.frame(adpca_statistics, row.names = adpca_statistics_labels))
+colnames(summary_statistics)[2] <- "RAS Pump"
+# knitr::kable(summary_statistics, digits = 1, caption = "Time to detection (hours)")
+
+# Plot everything
+source("case_study_plot.R")
+
+```
+
+
+## MT Inf: Clog (Dec. 23, 2017)
+What: Decline in MBR1 (MT1) influent
+When: Dec 23rd
+Why: Clog
+Variables: MBR1 & MBR2 influent, BIO1 & BIO2 TSS, RAS TSS
+
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+### Declare ADPCA parameters
+keyword <- "MT_inf_clog"
+## ADPCA parameters ##
+setwd("C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R")
+# Date to be evaluated with ADPCA model
+testingDay <- as.Date("2017 12 23", format = "%Y %m %d")
+# Number of days to train on
+rollingWindowDays <- 5
+# Number of times model is updated 
+updateDays <- rollingWindowDays
+# Total number of days to be compiled
+nDays <- rollingWindowDays + updateDays
+
+### Steps 2-4
+source("case_study_sop.R")
+```
+
+
+
+### Calculate fault detection statistics
+```{r}
+trueFaultTime <- as.POSIXct("2017-12-23 8:00 MST")
+trueAlarmTime <- as.POSIXct("2017-12-23 16:00 MST")
+SSAlarmTime <- index(alarmDataSS)[which(alarmDataSS$Alarm != 0)[1]]
+BRAlarmTime <- index(alarmDataBR)[which(alarmDataBR$Alarm != 0)[1]]
+# Single vs Multistate
+ss_alarm <- as.numeric(trueAlarmTime - SSAlarmTime)
+ms_alarm <- as.numeric(trueAlarmTime - BRAlarmTime)
+# SPE Single
+spe_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(1,3))[1]])
+# T2 Single
+t2_ss_alarm <- as.numeric(trueAlarmTime - index(alarmDataSS)[which(alarmDataSS$Alarm == c(2,3))[1]])
+# SPE Multi
+spe_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(1,3)))[1]])
+# T2 Multi
+t2_ms_alarm <- as.numeric(trueAlarmTime - index(alarmDataBR)[suppressWarnings(which(alarmDataBR$Alarm == c(2,3)))[1]])
+
+# ADPCA Statistics Ranking
+adpca_statistics <- c(spe_ss_alarm, t2_ss_alarm, spe_ms_alarm, t2_ms_alarm)
+adpca_statistics_labels <- c("SPE SS", "T2 SS", "SPE MS", "T2 MS")
+#adpca_statistics_labels[match(sort(adpca_statistics), adpca_statistics)]
+
+# Summary
+summary_statistics <- cbind(summary_statistics, as.data.frame(adpca_statistics, row.names = adpca_statistics_labels))
+colnames(summary_statistics)[3] <- "MT Inf"
+knitr::kable(summary_statistics, digits = 1, caption = "Time to detection (hours)")
+
+# Plot everything
+source("case_study_plot.R")
+```
+

@@ -1,0 +1,14 @@
+Time to detection (hours):
+
+RAS Pump: 
+"SPE MS"	"SPE SS"	"T2 SS" 	"T2 MS"
+4.826991	4.845764	4.861748	4.862442
+* BR1_TSS is not at SS
+
+Inf Pump:
+"SPE SS"	"T2 MS" 	"T2 SS"  	"SPE MS"
+15.00806 	15.32500 	15.89194 	18.51000
+
+MT1 Inf:
+* What happened on Dec 14th? 19th?
+

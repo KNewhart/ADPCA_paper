@@ -1,0 +1,836 @@
+---
+title: "Multivariate fault detection in WWTP"
+author: "Kathryn B. Newhart"
+date: "February 13, 2019"
+output:
+  powerpoint_presentation:
+    reference_doc: MinesPPT_4x3_KN.potx
+  # beamer_presentation: 
+  #   keep_tex: true
+  #   # colortheme: "lily"
+  #   includes:
+  #     in_header: csm-theme.sty
+institute: Colorado School of Mines
+---
+
+# Introduction to fault detection
+* Single variable monitoring is **traditional approach** in WWTP
+* Trend analysis is used, but methods are kept **private**
+* Multivariate statistical process monitoring is **widespread in literature**, but *not in practice*
+
+# Why use statistical process control?
+* Statistical Process Control (SPE)
+* There is **inherent variability** in WWTP that cannot be accounted for with an empirical model
+* Operator-determined setpoints may not be valid for all operating conditions, making the system reliant on diligent supervison. 
+* **To improve efficiency, need to improve process control**
+
+# Why use statistical process control?
+![](images/wwtp_data_fault_diagram.png)
+
+# Characteristics of big data
+![](images/char_big_data.png)
+
+# Principal Component Analysis
+:::::::::::::: {.columns}
+::: {.column}
+- Data reduction technique
+- Complex relationships between water quality variables
+  - Interpretable linear combinations of data
+- Which components represent the most variability?
+  - 1st component = maximum variance
+:::
+::: {.column}
+![](images/pca.png)
+:::
+::::::::::::::
+
+# Mines Park WWTP
+\begin{figure}
+   \includegraphics{images/sbmbr.png}
+\end{figure}
+
+
+# Mines Park WWTP
+![](images/sbmbr_flow_diagram.png)
+
+# Case studies
+Steps for each case study:
+
+ 1. Declare case study parameters
+ 2. Compile & clean raw data
+ 3. Train ADPCA model
+ 4. Test ADPCA model
+ 5. Calculate fault detection statistics
+ 6. Summarize results
+
+Required software:
+
+- R (free)
+- Student-developed packages (e.g., mvMonitoring, ADPCA)
+
+<!-- Case Study Data Compiler -->
+```{r Case Study Data Compiler, message=FALSE, warning=FALSE, include=FALSE}
+rm(list=ls())
+library(ADPCA)
+case_study_data_compiler <- function(keyword, testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days, rollingWindowDays, testMT = FALSE) {
+
+# keyword = Data file label
+# testingDay = Date to be evaluated with ADPCA model
+# days = Numer of days/times the program is run
+# rollingWindowDays = Number of days to train on
+# Install ADPCA package
+# devtools::install_github("KNewhart/ADPCA")
+
+
+
+# Number of times model is updated 
+updateDays <- rollingWindowDays
+
+# Total number of days to be compiled
+nDays <- rollingWindowDays + updateDays
+
+# Set working directory (where results files should be saved)
+wd <- "C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R"
+setwd(wd)
+
+# Alpha value for statistical analysis
+alphaN <- 0.01 
+
+# Number of successive OC observations to trigger an alarm
+faultsToTriggerAlarm <- 5 
+
+## Data processing parameters##
+# Set path of SB-MBR data (location of LogAllData folder)
+dataLocation <- "C:/Users/Kate Newhart/odrive/Mines/Data/MP_SBMBR_data/"
+# Variables from raw data that will be used to define the state of the bioreactor (BR) and the membrane bioreactor (MT, membrane tank). 
+stateVarsBR <- c("BIO_1\\CURRENT_PHASE",
+                 "BIO_2\\CURRENT_PHASE",
+                 "BIO_BLOWER_1\\RUNNING",
+                 "BIO_BLOWER_2\\RUNNING")
+stateVarsMT <- c("MBR_1\\CURRENT_MODE",
+                 "MBR_2\\CURRENT_MODE",
+                 "MBR\\CURRENT_FLUX_MODE",
+                 "MBR_1\\CURRENT_STATE",
+                 "MBR_2\\CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT")
+# Process variables from raw data that will be used for the BR and MT. 
+varsBR <- c("BIO_1\\CURRENT_PHASE",
+            "BIO_1\\DO\\PROCESS_VALUE",
+            "BIO_2\\CURRENT_PHASE",
+            "BIO_2\\DO\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\RUNNING",
+            "BIO_BLOWER_2\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_2\\RUNNING",
+            "SEWAGE\\FLOW\\PROCESS_VALUE",
+            "SEWAGE\\LEVEL\\PROCESS_VALUE",
+            "AMBIENT_TEMP\\PROCESS_VALUE",
+            "BIO_1\\LEVEL\\PROCESS_VALUE",
+            "BIO_1\\TEMPERATURE\\PROCESS_VALUE",
+            "BIO_2\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TEMPERATURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE")
+varsMT <- c("MBR_1\\CURRENT_MODE",
+            "MBR_1\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_1\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR_2\\CURRENT_MODE",
+            "MBR_2\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_2\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_1",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_2",
+            "MBR\\CURRENT_FLUX_MODE",
+            "MBR_1\\CURRENT_STATE",
+            "MBR_2\\CURRENT_STATE",
+            "MBR_1\\TRANS_PRESS\\PROCESS_VALUE",
+            "MBR_2\\TRANS_PRESS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_1",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_2",
+            "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+            "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\DO\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "PERMEATE_TANK\\CONDUCTIVITY\\PROCESS_VALUE",
+            "PERMEATE_TANK\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TSS\\PROCESS_VALUE",
+            "BIO_1\\TSS\\PROCESS_VALUE",
+            "MBR_1\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_1\\LEVEL\\PROCESS_VALUE",
+            "MBR_2\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_2\\LEVEL\\PROCESS_VALUE",
+            "PERMEATE_TANK\\TURBIDITY\\PROCESS_VALUE")
+
+
+# Collection of alarms throughout all days/times the program is run
+just.alarms <- list()
+# Set original testing day (i.e., start of loop)
+testingDay.org <- testingDay
+# Set true or false: enough data to test membranes?
+
+
+for (i in 1:days) {
+  
+  # Move testing day forward one day in loop
+  testingDay <- testingDay.org + i - 1
+  
+  # Initialize list of in-control data
+  testedData.list <- list()
+  
+  # If not the initial run of the loop, load previous iternation's results
+  if (i != 1) {
+    load(file = "trainingDataBR.R")
+    load(file = "trainingDataSS.R")
+    
+    # If there are sufficient observations to include the membrane sub-system, load membrane results too.
+      if (testMT) {
+        load(file = "trainingDataMT.R")
+        trainingData.list <- list(trainingDataSS, trainingDataBR, trainingDataMT)
+        alarmData.list <- list(alarmDataSS, alarmDataBR, alarmDataMT)
+      } else {
+        trainingData.list <- list(trainingDataSS, trainingDataBR)
+        alarmData.list <- list(alarmDataSS, alarmDataBR)
+      }
+    
+    # Initialize list of in-control observations for each sub-system
+    index.list <- list()
+    # For each sub-system in the trainingData.list object:
+    for (k in 1:length(trainingData.list)) {
+      # Merge different states
+      if (is.list(trainingData.list[[k]][[1]][[1]])) {
+        blah <- do.call("merge",trainingData.list[[k]][[1]][[1]])
+      } else {
+        blah <- trainingData.list[[k]][[1]]
+      }
+      # Keep timestamps
+      index.blah <- index(blah)
+      # Identify the alarm column
+      alarm.col <- which(colnames(alarmData.list[[k]]) == "Alarm")
+      # Only keep clean data
+      index.blah <- c(index.blah, index(alarmData.list[[k]][which(alarmData.list[[k]][,alarm.col] == 0),]))
+      # Add to list of in-control timestamps for each sub-system (objects in list)
+      index.list[[k]] <- index.blah
+    }
+  }
+  
+  ### Compile & clean raw data
+  # loadandcleanDBF returns a dataframe with all days including column names
+  rawData <- loadandcleanDBF(dataLocation, testingDay, nDays)
+  # convert to xts
+  rawData <- xts(rawData[,-1], order.by = rawData[,1])
+  rawData <- rawData[paste("/",testingDay,sep="")]
+  # Subset data into BR and and MT
+  dataBR <- rawData[,varsBR]
+  if (testMT) dataMT <- rawData[,varsMT]
+  # Clean single state data
+  uniqueData <- uniquenessCheck(rawData)
+  # Generate 'labelCol'
+  uniqueData <- cbind(uniqueData, rep(1,nrow(uniqueData)))
+  colnames(uniqueData)[ncol(uniqueData)] <- "labelCol"
+  
+  if (length(testedData.list) != 0) {
+    index.ss <- index.list[[1]][which(index.list[[1]] > paste(testingDay - nDays))]
+    if (range(index.ss)[1] > (paste(testingDay - nDays))) {
+      index.unique <- index(uniqueData)
+      index.unique.before <- index.unique[which(index.unique < range(index.ss)[1])]
+      index.ss <- c(index.unique.before, index.ss)
+    }
+    index.br <- index.list[[2]][which(index.list[[2]] > paste(testingDay - nDays))]
+    if (testMT) index.mt <- index.list[[3]][which(index.list[[3]] > paste(testingDay - nDays))]
+    
+  } else {
+    index.ss <- index(uniqueData)
+    index.br <- index(rawData)
+    if (testMT) index.mt <- index(rawData)
+  }
+
+  ### Train ADPCA model
+  ### Run multistate function for BR and MT, return xts with test data
+  trainingDataBR <- multistate_train(rawData = rawData[index.br],
+                                     vars = varsBR,
+                                     stateVars = stateVarsBR,
+                                     testingDay = testingDay,
+                                     rollingWindowDays = rollingWindowDays,
+                                     alphaN = alphaN,
+                                     faultsToTriggerAlarm = faultsToTriggerAlarm)
+  if (testMT) {
+    trainingDataMT <- multistate_train(rawData = rawData[index.mt],
+                                       vars = varsMT,
+                                       stateVars = stateVarsMT,
+                                       testingDay = testingDay,
+                                       rollingWindowDays = rollingWindowDays,
+                                       alphaN = alphaN,
+                                       faultsToTriggerAlarm = faultsToTriggerAlarm)
+  }
+  
+  trainingDataSS <- createTrainingSpecs(data = uniqueData[index.ss],
+                                        testingDay = testingDay,
+                                        rollingWindowDays = rollingWindowDays,
+                                        alpha = alphaN,
+                                        faultsToTriggerAlarm = faultsToTriggerAlarm)
+  
+  save(trainingDataBR, file = "trainingDataBR.R")
+  if (testMT) save(trainingDataMT, file = "trainingDataMT.R")
+  save(trainingDataSS, file = "trainingDataSS.R")
+  
+  # Create states
+  dataBR_ls <- stateGenerator(data = dataBR, stateVars = stateVarsBR, testingDay = testingDay, minObs = 1)
+  
+  if (testMT) dataMT_ls <- stateGenerator(data = dataMT, stateVars = stateVarsMT, testingDay = testingDay, minObs = 1)
+  
+  states2keepBR <- as.vector(sapply(trainingDataBR[[1]][[1]], function(x) x[1,ncol(x)]))
+  if (testMT) states2keepMT <- as.vector(sapply(trainingDataMT[[1]][[1]], function(x) x[1,ncol(x)]))
+  
+  # Only include states with training data
+  filtered.dataBR_ls <- list()
+  for (j in 1:length(states2keepBR)) {
+    for (k in 1:length(dataBR_ls)) {
+      n <- dataBR_ls[[k]]$labelCol[1]
+      if (n == states2keepBR[j]) {
+        filtered.dataBR_ls <- c(filtered.dataBR_ls, list(dataBR_ls[[k]]))
+      } else {}
+    }
+  }
+  
+  if (testMT) {
+    filtered.dataMT_ls <- list()
+    for (j in 1:length(states2keepMT)) {
+      for (k in 1:length(dataMT_ls)) {
+        n <- dataMT_ls[[k]]$labelCol[1]
+        if (n == states2keepMT[j]) {
+          filtered.dataMT_ls <- c(filtered.dataMT_ls, list(dataMT_ls[[k]]))
+        } else {}
+      }
+    }
+  }
+  
+  ### Test ADPCA model
+  # Test SS
+  alarmDataSS <- testNewObs(data = rawData,
+                            trainingSpecs = trainingDataSS,
+                            testingDay = testingDay,
+                            faultsToTriggerAlarm = faultsToTriggerAlarm)
+# Contribution plot 
+  {
+  # if (i == 1) {
+  #   mu.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, mean)[-1]
+  #   sd.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, stats::sd)[-1]
+  #   vars.SS <- colnames(trainingDataSS$Non_Alarmed_Obs)[-1]
+  #   vars.SS <- gsub("[.]", "\\\\", vars.SS)
+  #   
+  #   alarmDataSS.standardized.iterate <- rawData[paste0(testingDay,"/")][,(colnames(rawData) %in% vars.SS)]
+  #   
+  #   for (l in 1:(ncol(alarmDataSS.standardized.iterate))) {
+  #     
+  #     alarmDataSS.standardized.iterate[,l] <- (alarmDataSS.standardized.iterate[,l] - mu.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])])/sd.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])]
+  #     
+  #   }
+  #   
+  #   alarmDataSS.standardized <- as.data.frame(alarmDataSS.standardized.iterate)
+  #   
+  # } 
+  # 
+  # if (i != 1) {
+  #   mu.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, mean)[-1]
+  #   sd.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, stats::sd)[-1]
+  #   vars.SS <- colnames(trainingDataSS$Non_Alarmed_Obs)[-1]
+  #   vars.SS <- gsub("[.]", "\\\\", vars.SS)
+  #   
+  #   alarmDataSS.standardized.iterate <- rawData[paste0(testingDay,"/")][,(colnames(rawData) %in% vars.SS)]
+  #   
+  #   for (l in 1:(ncol(alarmDataSS.standardized.iterate))) {
+  #     
+  #     alarmDataSS.standardized.iterate[,l] <- (alarmDataSS.standardized.iterate[,l] - mu.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])])/sd.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])]
+  #     
+  #   }
+  #   
+  #   alarmDataSS.standardized <- fastmerge(alarmDataSS.standardized, as.data.frame(alarmDataSS.standardized.iterate))
+  # }
+}
+  
+  # Test multistate
+  alarmDataBR <- multistate_test(data = filtered.dataBR_ls,
+                                          trainingSpec_ls = trainingDataBR[[2]][[1]],
+                                          testingDay = trainingDataBR[[3]],
+                                          faultsToTriggerAlarm = trainingDataBR[[4]])
+  
+  if (testMT) {
+  alarmDataMT <- multistate_test(data = filtered.dataMT_ls,
+                                            trainingSpec_ls = trainingDataMT[[2]][[1]],
+                                            testingDay = trainingDataMT[[3]],
+                                            faultsToTriggerAlarm = trainingDataMT[[4]])
+  }
+  
+  save(alarmDataBR, file = "alarmDataBR.R")
+  if (testMT) save(alarmDataMT, file = "alarmDataMT.R")
+  save(alarmDataSS, file = "alarmDataSS.R")
+  
+  if (length(just.alarms) == 0) {
+    # Plot to check for normal operating conditions (i.e., good training data)
+    graph_rawData(rawData, paste0("results/",keyword))
+    
+    alarm.col <- which(colnames(alarmDataSS) == "Alarm")
+    alarm.row <- which(alarmDataSS[,alarm.col] != 0)
+    just.alarms[[1]] <- alarmDataSS[alarm.row, alarm.col]
+    
+    alarm.col <- which(colnames(alarmDataBR) == "Alarm")
+    alarm.row <- which(alarmDataBR[,alarm.col] != 0)
+    just.alarms[[2]] <- alarmDataBR[alarm.row, alarm.col]
+    
+    if (testMT) {
+      alarm.col <- which(colnames(alarmDataMT) == "Alarm")
+      alarm.row <- which(alarmDataMT[,alarm.col] != 0)
+      just.alarms[[3]] <- alarmDataMT[alarm.row, alarm.col]
+    }
+  } else {
+    
+    alarm.col <- which(colnames(alarmDataSS) == "Alarm")
+    alarm.row <- which(alarmDataSS[,alarm.col] != 0)
+    just.alarms[[1]] <- c(just.alarms[[1]], alarmDataSS[alarm.row, alarm.col])
+    
+    alarm.col <- which(colnames(alarmDataBR) == "Alarm")
+    alarm.row <- which(alarmDataBR[,alarm.col] != 0)
+    just.alarms[[2]] <- c(just.alarms[[2]], alarmDataBR[alarm.row, alarm.col])
+    
+    if (testMT) {
+      alarm.col <- which(colnames(alarmDataMT) == "Alarm")
+      alarm.row <- which(alarmDataMT[,alarm.col] != 0)
+      just.alarms[[3]] <- c(just.alarms[[3]], alarmDataMT[alarm.row, alarm.col])
+    }
+  }
+  
+  
+}
+
+# setwd(wd)
+
+### Compile & clean raw data
+# loadandcleanDBF returns a dataframe with all days including column names
+rawData <- loadandcleanDBF(dataLocation, testingDay, days)
+# convert to xts
+rawData <- xts(rawData[,-1], order.by = rawData[,1])
+rawData <- rawData[paste("/",testingDay,sep="")]
+# Subset data into BR and and MT
+dataBR <- rawData[,varsBR]
+if (testMT) dataMT <- rawData[,varsMT]
+# Clean single state data
+uniqueData <- uniquenessCheck(rawData)
+# Generate 'labelCol'
+uniqueData <- cbind(uniqueData, rep(1,nrow(uniqueData)))
+colnames(uniqueData)[ncol(uniqueData)] <- "labelCol"
+
+ss <- merge(uniqueData, just.alarms[[1]])
+ss$Alarm[is.na(ss$Alarm)] <- 0
+if (length(just.alarms[[2]]) != 0) {
+  br <- merge(dataBR, just.alarms[[2]])
+  br$Alarm[is.na(br$Alarm)] <- 0
+}
+if (testMT) mt <- merge(dataMT, just.alarms[[3]])
+if (testMT) mt$Alarm[is.na(mt$Alarm)] <- 0
+
+dir.create(file.path(wd, paste0("results/",keyword, " ", rollingWindowDays, " day")), showWarnings = FALSE)
+# graph_alarmData(data = ss, keyword = "results/continuous SS")
+save(ss, file = paste0("results/",keyword, " ", rollingWindowDays, " day/ss.RData"))
+if (length(just.alarms[[2]]) != 0) {
+  # graph_alarmData(data = br, keyword = "results/continuous BR")
+  save(br, file = paste0("results/",keyword, " ", rollingWindowDays, " day/br.RData"))
+}
+if (testMT) {
+  save(mt, file = paste0("results/",keyword, " ", rollingWindowDays, " day/mt.RData"))
+  # graph_alarmData(data = mt, keyword = "results/continuous MT")
+} 
+}
+```
+
+<!-- August, 5 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Aug", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 5)
+```
+
+<!-- August, 7 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Aug", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 7, testMT = TRUE)
+```
+
+<!-- August, 10 day -->
+```{r eval=FALSE, include=FALSE}
+# case_study_data_compiler(keyword = "Aug", testingDay = as.Date("2018 08 14", format = "%Y %m %d"), days = 13, rollingWindowDays = 10)
+# Error in eigen(R) : infinite or missing values in 'x'
+```
+
+<!-- January, 5 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Jan", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5)
+```
+
+<!-- January, 7 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Jan", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7)
+```
+
+<!-- January, 10 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Jan", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, testMT = TRUE)
+```
+
+<!-- February, 5 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Feb", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 5)
+```
+
+<!-- February, 7 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Feb", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 7, testMT = TRUE)
+```
+
+<!-- February, 10 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Feb", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 10, testMT = TRUE)
+```
+
+<!-- March, 5 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Mar", testingDay = as.Date("2018 03 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5)
+```
+
+<!-- March, 7 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Mar", testingDay = as.Date("2018 03 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7)
+```
+
+<!-- March, 10 day -->
+```{r eval=FALSE, include=FALSE}
+case_study_data_compiler(keyword = "Mar", testingDay = as.Date("2018 03 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, testMT = TRUE)
+```
+
+
+# Case study: membrane failure - 7 days
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load August 26-29th, 5-day training, SS
+load("results/Aug 7 day/ss.RData")
+# Plot MT1 TMP, Turbidity, Conductivity, and Alarms
+graph_alarmData(data = ss["2018-08-23/2018-08-31"][,c(7,19,26,31)], keyword = "images/7 day SS", w = 8, h = 1.5, filetype = "png")
+```
+![](images/7 day SS allGraphs 2018-08-23 2018-09-01.png)
+
+# Case study: membrane failure - 5 days
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load August 26-29th, 5-day training, SS
+load("results/Aug 5 day/ss.RData")
+# Plot MT1 TMP, Turbidity, Conductivity, and Alarms
+graph_alarmData(data = ss["2018-08-23/2018-08-31"][,c(7,19,26,31)], keyword = "images/5 day SS", w = 8, h = 1.5, filetype = "png")
+```
+![](images/5 day SS allGraphs 2018-08-23 2018-09-01.png)
+
+# Case study: pump shutdown - 10 days - ms
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 10-day training, SS
+load("results/Jan 10 day/br.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/10 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/10 day BR allGraphs 2018-01-29 2018-01-30.png)
+
+# Case study: pump shutdown - 7 days - ms
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 7-day training, SS
+load("results/Jan 7 day/br.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/7 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/7 day BR allGraphs 2018-01-29 2018-01-30.png)
+
+# Case study: pump shutdown - 5 days - ms
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 5-day training, SS
+load("results/Jan 5 day/br.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/5 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/5 day BR allGraphs 2018-01-29 2018-01-30.png)
+
+# Case study: pump shutdown - 10 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 10-day training, SS
+load("results/Jan 10 day/ss.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/10 day ss", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/10 day ss allGraphs 2018-01-29 2018-01-30.png)
+
+# Case study: pump shutdown - 7 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 7-day training, SS
+load("results/Jan 7 day/ss.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/7 day ss", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/7 day ss allGraphs 2018-01-29 2018-01-30.png)
+
+# Case study: pump shutdown - 5 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 29-30th, 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/5 day ss", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+```
+
+![](images/5 day ss allGraphs 2018-01-29 2018-01-30.png)
+
+
+# Case study: pump clog - 5 days
+```{r include=FALSE}
+# Add RAS Pump Clog 1-25-2018
+invisible(library(ADPCA))
+# Load Jan 29-30th, 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+# Plot 
+trueFaultTime <- as.POSIXct("2018-01-25 08:30 MST")
+# trueAlarmTime <- as.POSIXct("2018-01-25 08:30 MST")
+cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-01/2018-01-25 16:00 MST"][,n], keyword = "images/5 day SS", w = 11, h = 3, trueFaultTime = trueFaultTime, filetype = "png")
+```
+![](images/5 day SS allGraphs 2018-01-01 2018-01-25.png)
+
+# Case study: membrane shutdown - 10 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 10-day training, SS
+load("results/Jan 10 day/ss.RData")
+# cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "BIO_1.TSS.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "BIO_2.LEVEL.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE","PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-05 06:00/2018-01-05 14:00"][,n], keyword = "images/10 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15)
+```
+![](images/10 day SS allGraphs 2018-01-05 2018-01-05.png)
+
+# Case study: membrane shutdown - 10 days - ms
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 10-day training, MS
+load("results/Jan 10 day/mt.RData")
+# cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "BIO_1.TSS.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "BIO_2.LEVEL.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE","PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+graph_alarmData(data = mt["2018-01-05 06:00/2018-01-05 14:00"][,n], keyword = "images/10 day MT", w = 6, h = 2, filetype = "png", inset.delta = -.15)
+```
+![](images/10 day MT allGraphs 2018-01-05 2018-01-05.png)
+
+
+# Case study: membrane shutdown - 5 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+# cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "BIO_1.TSS.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "BIO_2.LEVEL.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE","PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-05 06:00/2018-01-05 14:00"][,n], keyword = "images/5 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15)
+```
+![](images/5 day SS allGraphs 2018-01-05 2018-01-05.png)
+
+# Case study: influent overdose - 5 days
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+# cols <- c("MBR.AIR_SCOUR_FLOW.PROCESS_VALUE_TANK_1","MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "BIO_1.TSS.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE","BIO_1.LEVEL.PROCESS_VALUE", "BIO_2.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_1.LEVEL.PROCESS_VALUE",  "BIO_2.TSS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+graph_alarmData(data = ss["2018-01-18/2018-01-19"][,n], keyword = "images/5 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15)
+```
+![](images/5 day SS allGraphs 2018-01-18 2018-01-20.png)
+
+# Case study: inf/eff quality changes - 5 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+cols <- c("BIO_1.DO.PROCESS_VALUE", "PERMEATE_TANK.TURBIDITY.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-21/2018-01-24"][,n]
+plot.data <- plot.data[which(plot.data[,3] != 0),]
+graph_alarmData(data = plot.data, keyword = "images/5 day SS", w = 6, h = 1.5, filetype = "png", inset.delta = -.05)
+```
+![](images/5 day SS allGraphs 2018-01-21 2018-01-25.png)
+
+# Case study: inf/eff quality changes - 10 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 10-day training, SS
+load("results/Jan 10 day/ss.RData")
+cols <- c("BIO_1.DO.PROCESS_VALUE", "PERMEATE_TANK.TURBIDITY.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-21/2018-01-24"][,n]
+plot.data <- plot.data[which(plot.data[,3] != 0),]
+graph_alarmData(data = plot.data, keyword = "images/10 day SS", w = 6, h = 1.5, filetype = "png", inset.delta = -.05)
+```
+![](images/10 day SS allGraphs 2018-01-21 2018-01-25.png)
+
+
+# Case study: inf/eff quality changes - 10 days - ms
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 10-day training, MS
+load("results/Jan 10 day/mt.RData")
+cols <- c("PERMEATE_TANK.TURBIDITY.PROCESS_VALUE", "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+plot.data <- mt["2018-01-21/2018-01-24"][,n]
+plot.data <- plot.data[which(plot.data[,3] != 0),]
+graph_alarmData(data = plot.data, keyword = "images/10 day MT", w = 6, h = 2, filetype = "png", inset.delta = -.05)
+```
+![](images/10 day MT allGraphs 2018-01-22 2018-01-24.png)
+
+
+# Case study: Clear clog in pump - 5 days - ss
+```{r include=FALSE}
+invisible(library(ADPCA))
+# Load Jan 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+cols <- c("MBR_1.INF_FLOW.PROCESS_VALUE", "MBR_2.INF_FLOW.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-24 16:47:31/2018-01-28"][,n]
+# plot.data <- plot.data[which(plot.data[,3] != 0),]
+graph_alarmData(data = plot.data, keyword = "images/5 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.1)
+```
+![](images/5 day SS allGraphs 2018-01-24 2018-01-29.png)
+
+<img src=""images/5 day SS allGraphs 2018-01-24 2018-01-29.svg">
+
+# Alarm rates: January - 5 day
+```{r eval=FALSE, include=FALSE}
+invisible(library(ADPCA))
+library(lubridate)
+# Load Jan 5-day training, SS
+load("results/Jan 5 day/ss.RData")
+
+# graph_alarmData(data = ss["2018-01-20/2018-01-31"], keyword = "images/5 day SS", w = 8, h = 1.5, filetype = "png")
+
+alarms <- ss$Alarm
+rm(new.alarm)
+for (i in 1:(nrow(alarms)-1)) {
+  if (as.numeric(alarms[i]) != as.numeric(alarms[i+1])) {
+    # if (as.numeric(alarms[i+1]) != 0) {
+      if (!exists("new.alarm")) {
+        new.alarm <- (i+1)
+      } 
+      if (exists("new.alarm")) {
+        new.alarm <- c(new.alarm, (i+1))
+      }
+    # }
+  }
+}
+new.alarm <- new.alarm[!duplicated(new.alarm)]
+index(ss)[new.alarm]
+
+real.alarms <- c(interval(as.POSIXct("2018-01-05 09:14:13"),as.POSIXct("2018-01-05 10:56:16")), interval(as.POSIXct("2018-01-08 19:57:47"),as.POSIXct("2018-01-08 19:58:48")), 
+                 interval(as.POSIXct("2018-01-11 11:57:11"),as.POSIXct("2018-01-11 12:48:13"))) # Membrane shutdown
+real.alarms <- c(real.alarms, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms <- c(real.alarms,  interval("2018-01-29 14:44:31","2018-01-30 13:58:19")) # Septic pump shutdown
+# What do consider the flow correction? 
+real.alarms <- c(real.alarms, interval("2018-01-25 08:03:03","2018-01-29 14:44:00")) # Flow correction
+
+all.alarms <- alarms["2018-01-01/2018-01-31"]
+all.alarms <- index(all.alarms)[which(all.alarms$Alarm != 0)]
+
+# sapply(real.alarms, function(x) { mapply(`%within%`, index(ss)[new.alarm], x) })
+for(i in 1:length(real.alarms)){
+  index <- which(all.alarms %within% real.alarms[[i]])
+  if (i == 1) {
+    all.index <- index
+  } else {
+    all.index <- c(all.index, index)
+  }
+}
+length(all.index)/length(all.alarms)
+```
+
+# Alarm rates: January - 10 day
+```{r eval=FALSE, include=FALSE}
+invisible(library(ADPCA))
+library(lubridate)
+# Load Jan 10-day training, SS
+load("results/Jan 10 day/ss.RData")
+
+# graph_alarmData(data = ss["2018-01-20/2018-01-31"], keyword = "images/5 day SS", w = 8, h = 1.5, filetype = "pdf")
+
+alarms <- ss$Alarm
+rm(new.alarm)
+for (i in 1:(nrow(alarms)-1)) {
+  if (as.numeric(alarms[i]) != as.numeric(alarms[i+1])) {
+    # if (as.numeric(alarms[i+1]) != 0) {
+      if (!exists("new.alarm")) {
+        new.alarm <- (i+1)
+      } 
+      if (exists("new.alarm")) {
+        new.alarm <- c(new.alarm, (i+1))
+      }
+    # }
+  }
+}
+new.alarm <- new.alarm[!duplicated(new.alarm)]
+index(ss)[new.alarm]
+
+real.alarms <- c(interval(as.POSIXct("2018-01-05 09:14:13"),as.POSIXct("2018-01-05 10:56:16")), interval(as.POSIXct("2018-01-08 19:57:47"),as.POSIXct("2018-01-08 19:58:48")), 
+                 interval(as.POSIXct("2018-01-11 11:57:11"),as.POSIXct("2018-01-11 12:48:13"))) # Membrane shutdown
+real.alarms <- c(real.alarms, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms <- c(real.alarms,  interval("2018-01-29 14:44:31","2018-01-30 13:58:19")) # Septic pump shutdown
+# What do consider the flow correction? 
+real.alarms <- c(real.alarms, interval("2018-01-25 08:03:03","2018-01-29 14:44:00")) # Flow correction
+
+all.alarms <- alarms["2018-01-01/2018-01-31"]
+all.alarms <- index(all.alarms)[which(all.alarms$Alarm != 0)]
+
+# sapply(real.alarms, function(x) { mapply(`%within%`, index(ss)[new.alarm], x) })
+for(i in 1:length(real.alarms)){
+  index <- which(all.alarms %within% real.alarms[[i]])
+  if (i == 1) {
+    all.index <- index
+  } else {
+    all.index <- c(all.index, index)
+  }
+}
+length(all.index)/length(all.alarms)
+```

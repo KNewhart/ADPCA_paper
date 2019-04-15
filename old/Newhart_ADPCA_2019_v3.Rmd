@@ -1,0 +1,350 @@
+---
+title: "Newhart ADPCA 2019 v3"
+author: "Kathryn Newhart"
+date: "January 15, 2019"
+output: word_document
+---
+
+# Case studies
+To prepare workspace to run case studies:
+* Load ADPCA package
+* Set parameters 
+
+Steps for each case study:
+1. Declare case study paramters
+2. Compile & clean raw data
+3. Train ADPCA model
+4. Test ADPCA model
+5. Calculate fault detection statistics
+6. Summarize results
+
+Required packages: 
++ ADPCA
+
+```{r}
+rm(list=ls())
+# Install ADPCA package
+# devtools::install_github("KNewhart/ADPCA")
+# Load ADPCA package
+library(ADPCA)
+# Set working directory (where results files should be saved)
+wd <- "C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R"
+setwd(wd)
+# Alpha value for statistical analysis
+alphaN <- 0.01 
+# Number of successive OC observations to trigger an alarm
+faultsToTriggerAlarm <- 5 
+## Data processing parameters##
+# Set path of SB-MBR data (location of LogAllData folder)
+dataLocation <- "C:/Users/Kate Newhart/odrive/Mines/Data/MP_SBMBR_data/"
+# Variables from raw data that will be used to define the state of the bioreactor (BR) and the membrane bioreactor (MT, membrane tank). 
+stateVarsBR <- c("BIO_1\\CURRENT_PHASE",
+                 "BIO_2\\CURRENT_PHASE",
+                 "BIO_BLOWER_1\\RUNNING",
+                 "BIO_BLOWER_2\\RUNNING")
+stateVarsMT <- c("MBR_1\\CURRENT_MODE",
+                 "MBR_2\\CURRENT_MODE",
+                 "MBR\\CURRENT_FLUX_MODE",
+                 "MBR_1\\CURRENT_STATE",
+                 "MBR_2\\CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT")
+# Process variables from raw data that will be used for the BR and MT. 
+varsBR <- c("BIO_1\\CURRENT_PHASE",
+            "BIO_1\\DO\\PROCESS_VALUE",
+            "BIO_2\\CURRENT_PHASE",
+            "BIO_2\\DO\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_1\\RUNNING",
+            "BIO_BLOWER_2\\FLOW\\PROCESS_VALUE",
+            "BIO_BLOWER_2\\RUNNING",
+            "SEWAGE\\FLOW\\PROCESS_VALUE",
+            "SEWAGE\\LEVEL\\PROCESS_VALUE",
+            "AMBIENT_TEMP\\PROCESS_VALUE",
+            "BIO_1\\LEVEL\\PROCESS_VALUE",
+            "BIO_1\\TEMPERATURE\\PROCESS_VALUE",
+            "BIO_2\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TEMPERATURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE")
+varsMT <- c("MBR_1\\CURRENT_MODE",
+            "MBR_1\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_1\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR_2\\CURRENT_MODE",
+            "MBR_2\\PERM_FLOW\\PROCESS_VALUE",
+            "MBR_2\\PERM_PRESS\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_1",
+            "MBR\\AIR_SCOUR_FLOW\\PROCESS_VALUE_TANK_2",
+            "MBR\\CURRENT_FLUX_MODE",
+            "MBR_1\\CURRENT_STATE",
+            "MBR_2\\CURRENT_STATE",
+            "MBR_1\\TRANS_PRESS\\PROCESS_VALUE",
+            "MBR_2\\TRANS_PRESS\\PROCESS_VALUE",
+            "RAS_TROUGH\\TEMPERATURE\\PROCESS_VALUE",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_1",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE_2",
+            "MBR_1_AIR_SCOUR_VALVE\\COMMAND_1",
+            "MBR_2_AIR_SCOUR_VALVE\\COMMAND_STAT",
+            "MBR\\AIR_SCOUR_PRESSURE\\PROCESS_VALUE",
+            "RAS_TROUGH\\DO\\PROCESS_VALUE",
+            "RAS_TROUGH\\PH\\PROCESS_VALUE",
+            "RAS_TROUGH\\TSS\\PROCESS_VALUE",
+            "PERMEATE_TANK\\CONDUCTIVITY\\PROCESS_VALUE",
+            "PERMEATE_TANK\\LEVEL\\PROCESS_VALUE",
+            "BIO_2\\TSS\\PROCESS_VALUE",
+            "BIO_1\\TSS\\PROCESS_VALUE",
+            "MBR_1\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_1\\LEVEL\\PROCESS_VALUE",
+            "MBR_2\\INF_FLOW\\PROCESS_VALUE",
+            "MBR_2\\LEVEL\\PROCESS_VALUE",
+            "PERMEATE_TANK\\TURBIDITY\\PROCESS_VALUE")
+```
+
+## August 2018
+### Set parameters
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+# Data file label
+keyword <- "Aug"
+# Date to be evaluated with ADPCA model
+testingDay <- as.Date("2018 08 12", format = "%Y %m %d")
+# Numer of days/times the program is run
+days <- 15
+# Number of days to train on
+rollingWindowDays <- 5
+# Number of times model is updated 
+updateDays <- rollingWindowDays
+# Total number of days to be compiled
+nDays <- rollingWindowDays + updateDays
+# Collection of alarms throughout all days/times the program is run
+just.alarms <- list()
+# Set original testing day (i.e., start of loop)
+testingDay.org <- testingDay
+# Set true or false: enough data to test membranes?
+testMT <- FALSE
+```
+### Compile data and execute ADPCA (loop)
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+for (i in 1:days) {
+  
+  # Move testing day forward one day in loop
+  testingDay <- testingDay.org + i - 1
+  
+  # Initialize list of in-control data
+  testedData.list <- list()
+  
+  # If not the initial run of the loop, load previous iternation's results
+  if (i != 1) {
+    load(file = "trainingDataBR.R")
+    load(file = "trainingDataSS.R")
+    
+    # If there are sufficient observations to include the membrane sub-system, load membrane results too.
+      if (testMT) {
+        load(file = "trainingDataMT.R")
+        trainingData.list <- list(trainingDataSS, trainingDataBR, trainingDataMT)
+        alarmData.list <- list(alarmDataSS, alarmDataBR, alarmDataMT)
+      } else {
+        trainingData.list <- list(trainingDataSS, trainingDataBR)
+        alarmData.list <- list(alarmDataSS, alarmDataBR)
+      }
+    
+    # Initialize list of in-control observations for each sub-system
+    index.list <- list()
+    # For each sub-system in the trainingData.list object:
+    for (k in 1:length(trainingData.list)) {
+      # Merge different states
+      if (is.list(trainingData.list[[k]][[1]][[1]])) {
+        blah <- do.call("merge",trainingData.list[[k]][[1]][[1]])
+      } else {
+        blah <- trainingData.list[[k]][[1]]
+      }
+      # Keep timestamps
+      index.blah <- index(blah)
+      # Identify the alarm column
+      alarm.col <- which(colnames(alarmData.list[[k]]) == "Alarm")
+      # Only keep clean data
+      index.blah <- c(index.blah, index(alarmData.list[[k]][which(alarmData.list[[k]][,alarm.col] == 0),]))
+      # Add to list of in-control timestamps for each sub-system (objects in list)
+      index.list[[k]] <- index.blah
+    }
+  }
+  
+  ### Compile & clean raw data
+  # loadandcleanDBF returns a dataframe with all days including column names
+  rawData <- loadandcleanDBF(dataLocation, testingDay, nDays)
+  # convert to xts
+  rawData <- xts(rawData[,-1], order.by = rawData[,1])
+  rawData <- rawData[paste("/",testingDay,sep="")]
+  # Subset data into BR and and MT
+  dataBR <- rawData[,varsBR]
+  if (testMT) dataMT <- rawData[,varsMT]
+  # Clean single state data
+  uniqueData <- uniquenessCheck(rawData)
+  # Generate 'labelCol'
+  uniqueData <- cbind(uniqueData, rep(1,nrow(uniqueData)))
+  colnames(uniqueData)[ncol(uniqueData)] <- "labelCol"
+  
+  if (length(testedData.list) != 0) {
+    index.ss <- index.list[[1]][which(index.list[[1]] > paste(testingDay - nDays))]
+    if (range(index.ss)[1] > (paste(testingDay - nDays))) {
+      index.unique <- index(uniqueData)
+      index.unique.before <- index.unique[which(index.unique < range(index.ss)[1])]
+      index.ss <- c(index.unique.before, index.ss)
+    }
+    index.br <- index.list[[2]][which(index.list[[2]] > paste(testingDay - nDays))]
+    if (testMT) index.mt <- index.list[[3]][which(index.list[[3]] > paste(testingDay - nDays))]
+    
+  } else {
+    index.ss <- index(uniqueData)
+    index.br <- index(rawData)
+    if (testMT) index.mt <- index(rawData)
+  }
+
+  ### Train ADPCA model
+  ### Run multistate function for BR and MT, return xts with test data
+  trainingDataBR <- multistate_train(rawData = rawData[index.br],
+                                     vars = varsBR,
+                                     stateVars = stateVarsBR,
+                                     testingDay = testingDay,
+                                     rollingWindowDays = rollingWindowDays,
+                                     alphaN = alphaN,
+                                     faultsToTriggerAlarm = faultsToTriggerAlarm)
+  if (testMT) {
+    trainingDataMT <- multistate_train(rawData = rawData[index.mt],
+                                       vars = varsMT,
+                                       stateVars = stateVarsMT,
+                                       testingDay = testingDay,
+                                       rollingWindowDays = rollingWindowDays,
+                                       alphaN = alphaN,
+                                       faultsToTriggerAlarm = faultsToTriggerAlarm)
+  }
+  
+  trainingDataSS <- createTrainingSpecs(data = uniqueData[index.ss],
+                                        testingDay = testingDay,
+                                        rollingWindowDays = rollingWindowDays,
+                                        alpha = alphaN,
+                                        faultsToTriggerAlarm = faultsToTriggerAlarm)
+  
+  save(trainingDataBR, file = "trainingDataBR.R")
+  if (testMT) save(trainingDataMT, file = "trainingDataMT.R")
+  save(trainingDataSS, file = "trainingDataSS.R")
+  
+  # Create states
+  dataBR_ls <- stateGenerator(data = dataBR, stateVars = stateVarsBR, testingDay = testingDay, minObs = 1)
+  
+  if (testMT) dataMT_ls <- stateGenerator(data = dataMT, stateVars = stateVarsMT, testingDay = testingDay, minObs = 1)
+  
+  states2keepBR <- as.vector(sapply(trainingDataBR[[1]][[1]], function(x) x[1,ncol(x)]))
+  if (testMT) states2keepMT <- as.vector(sapply(trainingDataMT[[1]][[1]], function(x) x[1,ncol(x)]))
+  
+  # Only include states with training data
+  filtered.dataBR_ls <- list()
+  for (j in 1:length(states2keepBR)) {
+    for (i in 1:length(dataBR_ls)) {
+      n <- dataBR_ls[[i]]$labelCol[1]
+      if (n == states2keepBR[j]) {
+        filtered.dataBR_ls <- c(filtered.dataBR_ls, list(dataBR_ls[[i]]))
+      } else {}
+    }
+  }
+  
+  if (testMT) {
+    filtered.dataMT_ls <- list()
+    for (j in 1:length(states2keepMT)) {
+      for (i in 1:length(dataMT_ls)) {
+        n <- dataMT_ls[[i]]$labelCol[1]
+        if (n == states2keepMT[j]) {
+          filtered.dataMT_ls <- c(filtered.dataMT_ls, list(dataMT_ls[[i]]))
+        } else {}
+      }
+    }
+  }
+  
+  ### Test ADPCA model
+  # Test SS
+  alarmDataSS <- testNewObs(data = rawData,
+                            trainingSpecs = trainingDataSS,
+                            testingDay = testingDay,
+                            faultsToTriggerAlarm = faultsToTriggerAlarm)
+  
+  # Test multistate
+  alarmDataBR <- multistate_test(data = filtered.dataBR_ls,
+                                          trainingSpec_ls = trainingDataBR[[2]][[1]],
+                                          testingDay = trainingDataBR[[3]],
+                                          faultsToTriggerAlarm = trainingDataBR[[4]])
+  
+  if (testMT) {
+  alarmDataMT <- multistate_test(data = filtered.dataMT_ls,
+                                            trainingSpec_ls = trainingDataMT[[2]][[1]],
+                                            testingDay = trainingDataMT[[3]],
+                                            faultsToTriggerAlarm = trainingDataMT[[4]])
+  }
+  
+  save(alarmDataBR, file = "alarmDataBR.R")
+  if (testMT) save(alarmDataMT, file = "alarmDataMT.R")
+  save(alarmDataSS, file = "alarmDataSS.R")
+  
+  if (length(just.alarms) == 0) {
+    # Plot to check for normal operating conditions (i.e., good training data)
+    graph_rawData(rawData, paste0("results/",keyword))
+    
+    alarm.col <- which(colnames(alarmDataSS) == "Alarm")
+    alarm.row <- which(alarmDataSS[,alarm.col] != 0)
+    just.alarms[[1]] <- alarmDataSS[alarm.row, alarm.col]
+    
+    alarm.col <- which(colnames(alarmDataBR) == "Alarm")
+    alarm.row <- which(alarmDataBR[,alarm.col] != 0)
+    just.alarms[[2]] <- alarmDataBR[alarm.row, alarm.col]
+    
+    if (testMT) {
+      alarm.col <- which(colnames(alarmDataMT) == "Alarm")
+      alarm.row <- which(alarmDataMT[,alarm.col] != 0)
+      just.alarms[[3]] <- alarmDataMT[alarm.row, alarm.col]
+    }
+  } else {
+    
+    alarm.col <- which(colnames(alarmDataSS) == "Alarm")
+    alarm.row <- which(alarmDataSS[,alarm.col] != 0)
+    just.alarms[[1]] <- c(just.alarms[[1]], alarmDataSS[alarm.row, alarm.col])
+    
+    alarm.col <- which(colnames(alarmDataBR) == "Alarm")
+    alarm.row <- which(alarmDataBR[,alarm.col] != 0)
+    just.alarms[[2]] <- c(just.alarms[[2]], alarmDataBR[alarm.row, alarm.col])
+    
+    if (testMT) {
+      alarm.col <- which(colnames(alarmDataMT) == "Alarm")
+      alarm.row <- which(alarmDataMT[,alarm.col] != 0)
+      just.alarms[[3]] <- c(just.alarms[[3]], alarmDataMT[alarm.row, alarm.col])
+    }
+  }
+}
+```
+### Plot results
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+setwd(wd)
+### Compile & clean raw data
+# loadandcleanDBF returns a dataframe with all days including column names
+rawData <- loadandcleanDBF(dataLocation, testingDay, days)
+# convert to xts
+rawData <- xts(rawData[,-1], order.by = rawData[,1])
+rawData <- rawData[paste("/",testingDay,sep="")]
+# Subset data into BR and and MT
+dataBR <- rawData[,varsBR]
+if (testMT) dataMT <- rawData[,varsMT]
+# Clean single state data
+uniqueData <- uniquenessCheck(rawData)
+# Generate 'labelCol'
+uniqueData <- cbind(uniqueData, rep(1,nrow(uniqueData)))
+colnames(uniqueData)[ncol(uniqueData)] <- "labelCol"
+
+ss <- merge(uniqueData, just.alarms[[1]])
+ss$Alarm[is.na(ss$Alarm)] <- 0
+br <- merge(dataBR, just.alarms[[2]])
+br$Alarm[is.na(br$Alarm)] <- 0
+if (testMT) mt <- merge(dataMT, just.alarms[[3]])
+if (testMT) mt$Alarm[is.na(mt$Alarm)] <- 0
+
+graph_alarmData(data = ss, keyword = "results/continuous SS")
+graph_alarmData(data = br, keyword = "results/continuous BR")
+if (testMT) graph_alarmData(data = mt, keyword = "results/continuous MT")
+```
