@@ -1,0 +1,922 @@
+---
+title: "Presentation Plots"
+author: "Kathryn B. Newhart"
+date: "April 16, 2019"
+institute: Colorado School of Mines
+---
+
+```{r Required functions, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+rm(list=ls())
+
+# Load required packages
+packageLoad <- function(packName){ #packName - package name as a character string, e.g. "quantmod"
+  if(!require(packName,character.only = TRUE)){ #If the package is not available, install it
+    install.packages(packName,dependencies=TRUE,repos="http://cran.r-project.org")
+  }
+  library(packName, character.only = TRUE) # load package
+}
+sapply(c("knitr", "readxl", "xts"), function(x) packageLoad(x))
+
+# Plotting functions
+windowsFonts(A = windowsFont("Times New Roman"))
+variable.normal.curve.plot <- function(data, days) {
+  par(mar=c(2.1,2.1,3.6,0.6), cex.main = 1.1*1.15)
+  
+  data1 <- data[[1]]
+  plot(density(data1[which(data1 > 0)]), main = "", xlab = "", ylab = ""
+       # 
+       )
+  # abline(v=mean(data[[1]][which(data[[1]] > 0)]), lty = 2, lwd = 1.5)
+  curve(dnorm(x, 
+              mean=mean(data1), 
+              sd=sqrt(var(data1))),
+        min(data1),
+        max(data1),
+        add=T,
+        lty = 2, 
+        lwd = 1.5)
+  mtext("Single-State", side = 3, line = .5, cex = 1.15*.7, font = 2
+        # 
+  )
+  
+  data1 <- data[[2]]
+  plot(density(data1[which(data1 > 0)]), main = "", xlab = "", ylab = ""
+       # 
+       )
+  # abline(v=mean(data[[1]][which(data[[1]] > 0)]), lty = 2, lwd = 1.5)
+  curve(dnorm(x, 
+              mean=mean(data1), 
+              sd=sqrt(var(data1))),
+        min(data1),
+        max(data1),
+        add=T,
+        lty = 2, 
+        lwd = 1.5)
+  mtext("Multistate SBR State", side = 3, line = .5, cex = 1.15*.7, font = 2
+               # 
+       )
+  mtext(paste(days, "day training data"), side = 3, line = 1.7, cex = 1.15*.85, font = 2
+               # 
+       )
+  
+  data1 <- data[[3]]
+  plot(density(data1[which(data1 > 0)]), main = "", xlab = "", ylab = ""
+       # 
+       )
+  # abline(v=mean(data[[1]][which(data[[1]] > 0)]), lty = 2, lwd = 1.5)
+  curve(dnorm(x, 
+              mean=mean(data1), 
+              sd=sqrt(var(data1))),
+        min(data1),
+        max(data1),
+        add=T,
+        lty = 2, 
+        lwd = 1.5)
+  mtext("Multistate MBR State", side = 3, line = .5, cex = 1.15*.7, font = 2
+        # 
+        )
+}
+```
+
+
+```{r RAS TSS Variable Distribution, eval=FALSE, include=FALSE}
+png("poster/ADPCA_density_ras.png", units = "in", res=2000, width = 6.5, height = 3*1.8)
+par(mfrow = c(3,3))
+###### 5 Day ######
+days <- 5
+
+load(paste0("results/Jan 2018 ",days," day/ss.RData"))
+# Kernel density plot
+data <- data.frame(ss[paste0(as.Date(index(ss)[1]),"/",(as.Date(index(ss)[1])+days))][,1:(ncol(ss)-2)])
+ras.trough.ss <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+load(paste0("results/Jan 2018 ",days," day/br.RData"))
+stateVarsBR <- c("BIO_1.CURRENT_PHASE",
+                 "BIO_2.CURRENT_PHASE",
+                 "BIO_BLOWER_1.RUNNING",
+                 "BIO_BLOWER_2.RUNNING")
+stateCols <- which(colnames(br) %in% stateVarsBR)
+data <- ADPCA::stateGenerator(data = br, stateVars = stateVarsBR, testingDay = as.Date(index(br)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.br <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+
+load(paste0("results/Jan 2018 ",days," day/mt.RData"))
+stateVarsMT <- c("MBR_1.CURRENT_MODE",
+                 "MBR_2.CURRENT_MODE",
+                 "MBR.CURRENT_FLUX_MODE",
+                 "MBR_1.CURRENT_STATE",
+                 "MBR_2.CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE.COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE.COMMAND_STAT")
+stateCols <- which(colnames(mt) %in% stateVarsMT)
+data <- ADPCA::stateGenerator(data = mt, stateVars = stateVarsMT, testingDay = as.Date(index(mt)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.mt <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+variable.normal.curve.plot(data=list(ras.trough.ss, ras.trough.br, ras.trough.mt), days=days)
+###### 7 Day ######
+days <- 7
+
+load(paste0("results/Jan 2018 ",days," day/ss.RData"))
+# Kernel density plot
+data <- data.frame(ss[paste0(as.Date(index(ss)[1]),"/",(as.Date(index(ss)[1])+days))][,1:(ncol(ss)-2)])
+ras.trough.ss <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+load(paste0("results/Jan 2018 ",days," day/br.RData"))
+stateVarsBR <- c("BIO_1.CURRENT_PHASE",
+                 "BIO_2.CURRENT_PHASE",
+                 "BIO_BLOWER_1.RUNNING",
+                 "BIO_BLOWER_2.RUNNING")
+stateCols <- which(colnames(br) %in% stateVarsBR)
+data <- ADPCA::stateGenerator(data = br, stateVars = stateVarsBR, testingDay = as.Date(index(br)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.br <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+
+load(paste0("results/Jan 2018 ",days," day/mt.RData"))
+stateVarsMT <- c("MBR_1.CURRENT_MODE",
+                 "MBR_2.CURRENT_MODE",
+                 "MBR.CURRENT_FLUX_MODE",
+                 "MBR_1.CURRENT_STATE",
+                 "MBR_2.CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE.COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE.COMMAND_STAT")
+stateCols <- which(colnames(mt) %in% stateVarsMT)
+data <- ADPCA::stateGenerator(data = mt, stateVars = stateVarsMT, testingDay = as.Date(index(mt)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.mt <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+variable.normal.curve.plot(data=list(ras.trough.ss, ras.trough.br, ras.trough.mt), days=days)
+
+###### 10 Day ######
+days <- 10
+
+load(paste0("results/Jan 2018 ",days," day/ss.RData"))
+# Kernel density plot
+data <- data.frame(ss[paste0(as.Date(index(ss)[1]),"/",(as.Date(index(ss)[1])+days))][,1:(ncol(ss)-2)])
+ras.trough.ss <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+load(paste0("results/Jan 2018 ",days," day/br.RData"))
+stateVarsBR <- c("BIO_1.CURRENT_PHASE",
+                 "BIO_2.CURRENT_PHASE",
+                 "BIO_BLOWER_1.RUNNING",
+                 "BIO_BLOWER_2.RUNNING")
+stateCols <- which(colnames(br) %in% stateVarsBR)
+data <- ADPCA::stateGenerator(data = br, stateVars = stateVarsBR, testingDay = as.Date(index(br)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.br <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+
+load(paste0("results/Jan 2018 ",days," day/mt.RData"))
+stateVarsMT <- c("MBR_1.CURRENT_MODE",
+                 "MBR_2.CURRENT_MODE",
+                 "MBR.CURRENT_FLUX_MODE",
+                 "MBR_1.CURRENT_STATE",
+                 "MBR_2.CURRENT_STATE",
+                 "MBR_1_AIR_SCOUR_VALVE.COMMAND_1",
+                 "MBR_2_AIR_SCOUR_VALVE.COMMAND_STAT")
+stateCols <- which(colnames(mt) %in% stateVarsMT)
+data <- ADPCA::stateGenerator(data = mt, stateVars = stateVarsMT, testingDay = as.Date(index(mt)[1])+(days+1), rollingWindowDays = days)
+mostFreqState <- which(unlist(lapply(data, function(x) nrow(x))) == max(unlist(lapply(data, function(x) nrow(x)))))
+data <- data.frame(data[[mostFreqState]])
+ras.trough.mt <- data$RAS_TROUGH.TSS.PROCESS_VALUE
+
+variable.normal.curve.plot(data=list(ras.trough.ss, ras.trough.br, ras.trough.mt), days=days)
+#####
+dev.off()
+```
+
+```{r Raw Data Plot}
+graph_rawData <- function (data, keyword="", trueFaultTime = NULL, alarm.interval = NULL) {
+  sapply(c("scales", "lubridate"), function(x) packageLoad(x))
+  cols <- grep("PROCESS_VALUE", colnames(data))
+  data <- data[,cols]
+  colnames(data) <- sapply(colnames(data), function(x) unlist(strsplit(x, "PROCESS_VALUE"))[1])
+  n <- ncol(data)
+  tmp <- grep("TRANS_PRESS", colnames(data))
+  do <- grep("DO", colnames(data))
+  level <- grep("BIO_1.LEVEL", colnames(data))
+  dates <- index(data)
+  r <- as.POSIXct(range(dates), format = "%Y-%m-%d %H:%M:%S")
+  r.hours <- as.numeric(difftime(r[2], r[1], units = "hours"))
+  
+  if (keyword=="") {
+    filename <- paste("allGraphs",as.Date(r[1]), as.Date(r[2]))
+    } else {
+      filename <- paste(keyword, "allGraphs",as.Date(r[1]), as.Date(r[2]))
+    }
+  
+  if (!is.null(alarm.interval)) {
+    alarm.index <- unlist(sapply(alarm.interval, function(x) which(index(data) %within% x)))
+    # nonalarm.index <- unlist(sapply(alarm.interval, function(x) which(!(index(data) %within% x))))
+  } else {
+    # nonalarm.index <- 1:nrow(data)
+  }
+
+  colnames(data) <- stringr::str_replace_all(colnames(data), c("[.]" = " ", "_" = " "))
+  
+  plot.it <- function() {
+    par(mfrow=c(ceiling(n/2),2), mar = c(2.1, 3.1, 2.1, 2.1))
+
+    for (i in 1:n) {
+
+      if (i %in% tmp) {
+        plot(x = dates,
+             y = data[,i],
+             xaxt="n",
+             ylim=c(0,7),
+             xlab = "",
+             ylab = "",
+             main = colnames(data)[i],
+             pch=20,
+             col = "black")
+        if(!is.null(alarm.interval)) points(x = index(data[alarm.index]),
+                                          y = data[alarm.index,i],
+                                          pch=20,
+                                          col = "red")
+        if (r.hours > 24) {
+          axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+        } else {
+          axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+        }
+
+        if (!is.null(trueFaultTime)) abline(v=trueFaultTime, col="blue")
+
+      } else {
+        if (i %in% do) {
+          plot(x = dates,
+               y = data[,i],
+               xaxt="n",
+               ylim=c(0,3),
+               xlab = "",
+               ylab = "",
+               main = colnames(data)[i],
+               pch=20,
+               col = "black")
+        if(!is.null(alarm.interval)) points(x = index(data[alarm.index]),
+                                          y = data[alarm.index,i],
+                                          pch=20,
+                                          col = "red")
+          # line.ewma <- ewma(data[,i], n = 1440, alpha = 0.01)
+          # points(x = index(line.ewma),
+          #        y = line.ewma, col = "red")
+
+          if (r.hours > 24) {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          } else {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+          }
+
+          if (!is.null(trueFaultTime)) abline(v=trueFaultTime, col="blue")
+
+        } else {
+          if (i %in% level) {
+               plot(x = dates,
+               y = data[,i],
+               xaxt="n",
+               ylim=c(5,7.5),
+               xlab = "",
+               ylab = "",
+               main = colnames(data)[i],
+               pch=20,
+               col = "black")
+        if(!is.null(alarm.interval)) points(x = index(data[alarm.index]),
+                                          y = data[alarm.index,i],
+                                          pch=20,
+                                          col = "red")
+          # line.ewma <- ewma(data[,i], n = 1440, alpha = 0.01)
+          # points(x = index(line.ewma),
+          #        y = line.ewma, col = "red")
+
+          if (r.hours > 24) {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          } else {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+          }
+
+          if (!is.null(trueFaultTime)) abline(v=trueFaultTime, col="blue")
+          } else {
+          plot(x = dates,
+               y = data[,i],
+               xaxt="n",
+               xlab = "",
+               ylab = "",
+               main = colnames(data)[i],
+               pch=20,
+               col = "black")
+        if(!is.null(alarm.interval)) points(x = index(data[alarm.index]),
+                                          y = data[alarm.index,i],
+                                          pch=20,
+                                          col = "red")
+          # line.ewma <- ewma(data[,i])
+          # line(x = index(line.ewma),
+          #      y = line.ewma)
+          if (r.hours > 24) {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          } else {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+          }
+          # axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          if (!is.null(trueFaultTime)) abline(v=trueFaultTime, col="blue")
+        }
+      }
+    }
+  }
+  }
+  # png(file = paste(filename, ".png", sep=""), units = "in", res = 96, width = 11, height =n*3)
+  # pdf(file = paste(filename,".pdf", sep=''),
+  #     width = 30,
+  #     height = (n)*2)
+  # svg(filename = paste(filename, ".svg", sep=""), width = 8, height =n*2, family = "serif")
+
+  png(file = paste(filename, ".png", sep=""), units = "in", res = 300, width = 6.5, height = (n-.5))
+  plot.it()
+  dev.off()
+  # plot.it() # Margins too large to plot
+}
+
+```
+
+```{r Alarm Data Plot}
+graph_alarmData <- function (data,
+                             trueFaultTime = NULL,
+                             trueAlarmTime = NULL,
+                             inset.delta = 0,
+                             label = "",
+                             letter = "") {
+  packageLoad("scales")
+
+  alarms <- data[,which(colnames(data) == "Alarm")]
+  cols <- grep("PROCESS_VALUE", colnames(data))
+  data <- data[,cols]
+  colnames(data) <- sapply(colnames(data), function(x) unlist(strsplit(x, "PROCESS_VALUE"))[1])
+  n <- ncol(data)
+  tmp <- grep("TRANS_PRESS", colnames(data))
+  do <- grep("DO", colnames(data))
+  dates <- index(data)
+  r <- as.POSIXct(range(dates), format = "%Y-%m-%d %H:%M:%S")
+  r.hours <- as.numeric(difftime(r[2], r[1], units = "hours"))
+  colnames(data) <- stringr::str_replace_all(colnames(data), c("[.]" = " ", "_" = " "))
+
+  plot.it <- function() {
+    # if (is.null(trueAlarmTime)) par(mfrow=c((n),1), mar = c(2.1, 3.1, 3.6, 5.6))
+    # if (!is.null(trueAlarmTime)) par(mfrow=c((n),1), mar = c(2.1, 3.1, 3.6, 9.1))
+
+    for (i in 1:n) {
+
+      if (i %in% tmp) {
+        plot(x = dates,
+             y = data[,i],
+             xaxt="n",
+             #ylim=c(0,7),
+             xlab = "",
+             ylab = "",
+             main = "",
+             pch = 20,
+             #col = "black")
+             col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+        if (r.hours > 49) {
+          axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+        } else {
+          axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+        }
+
+        if (!is.null(trueFaultTime)) {
+          abline(v=trueFaultTime, lty = 1, col = "blue")
+        } else {}
+
+        if (!is.null(trueAlarmTime)) {
+          abline(v=trueAlarmTime, lty = 2, col = "red")
+        } else {}
+
+        # if(is.null(trueAlarmTime)) {
+        #   legend("right", inset = c((-.075+inset.delta),0),
+        #          legend = c("IC", "T2", "SPE", "Both"),
+        #          col = c("black", "red", "orange", "purple"),
+        #          pch = 16,
+        #          bty = "n",
+        #          xpd=NA)
+        # }
+
+        # if (!is.null(trueAlarmTime)) {
+        #   legend("right", inset = c((-.2+inset.delta),0),
+        #          legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+        #          col = c("black", "red", "orange", "purple","blue", "red"),
+        #          pch = c(16,16,16,16,NA,NA),
+        #          lty = c(NA,NA,NA,NA,1,2),
+        #          bty = "n",
+        #          xpd=NA)
+        # }
+
+        
+      } else {
+        if (i %in% do) {
+          plot(x = dates,
+               y = data[,i],
+               xaxt="n",
+               ylim=c(0,3),
+               xlab = "",
+               ylab = "",
+               main = "",
+               pch = 20,
+               #col = "black")
+               col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+
+          # line.ewma <- ewma(data[,i], n = 1440, alpha = 0.01)
+          # points(x = index(line.ewma),
+          #        y = line.ewma, col = "red")
+
+          if (r.hours > 49) {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          } else {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+          }
+
+          if (!is.null(trueFaultTime)) {
+            abline(v=trueFaultTime, lty = 1, col = "blue")
+          } else {}
+
+          if (!is.null(trueAlarmTime)) {
+            abline(v=trueAlarmTime, lty = 2, col = "red")
+          } else {}
+
+          # if(is.null(trueAlarmTime)) {
+          #   legend("right", inset = c((-.075+inset.delta),0),
+          #          legend = c("IC", "T2", "SPE", "Both"),
+          #          col = c("black", "red", "orange", "purple"),
+          #          pch = 16,
+          #          bty = "n",
+          #          xpd=NA)
+          # }
+          # 
+          # if (!is.null(trueAlarmTime)) {
+          #   legend("right", inset = c((-.2+inset.delta),0),
+          #          legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+          #          col = c("black", "red", "orange", "purple","blue", "red"),
+          #          pch = c(16,16,16,16,NA,NA),
+          #          lty = c(NA,NA,NA,NA,1,2),
+          #          bty = "n",
+          #          xpd=NA)
+          # }
+        } else {
+          plot(x = dates,
+               y = data[,i],
+               xaxt="n",
+               xlab = "",
+               ylab = "",
+               main = "",
+               pch = 20,
+               #col = "black")
+               col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+
+          # line.ewma <- ewma(data[,i])
+          # line(x = index(line.ewma),
+          #      y = line.ewma)
+          if (r.hours > 49) {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          } else {
+            axis.POSIXct(1, at = seq(r[1], r[2], by = "hours"), cex.axis = 1, format = "%H:%M")
+          }
+          # axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
+          if (!is.null(trueFaultTime)) {
+            abline(v=trueFaultTime, lty = 1, col = "blue")
+          } else {}
+
+          if (!is.null(trueAlarmTime)) {
+            abline(v=trueAlarmTime, lty = 2, col = "red")
+          } else {}
+
+          # if(is.null(trueAlarmTime)) {
+          #   legend("right", inset = c((-.075+inset.delta),0),
+          #          legend = c("IC", "T2", "SPE", "Both"),
+          #          col = c("black", "red", "orange", "purple"),
+          #          pch = 16,
+          #          bty = "n",
+          #          xpd=NA)
+          # }
+          # 
+          # if (!is.null(trueAlarmTime)) {
+          #   legend("right", inset = c((-.2+inset.delta),0),
+          #          legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+          #          col = c("black", "red", "orange", "purple","blue", "red"),
+          #          pch = c(16,16,16,16,NA,NA),
+          #          lty = c(NA,NA,NA,NA,1,2),
+          #          bty = "n",
+          #          xpd=NA)
+          # }
+
+        }
+        
+      }
+      if (i == 1) mtext(label, side = 3, line = 1.7, cex = .9, font = 2)
+        mtext(colnames(data)[i], side = 3, line = .5, cex = .7, font = 2)
+        mtext(letter, side = 3, line = .5, cex = .7, font = 2, adj = 0)
+    }
+
+  }
+
+
+ plot.it()
+
+}
+
+
+# Pump failure 
+{
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+
+png("poster/pump failure.png", units = "in", res = 300, width = 6.5, height = 4.5)
+par(mfcol=c(3,2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+
+##### Pump failure - SS #####
+load("results/Jan 2018 5 day/ss.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+# ADPCA::graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/5 day SS", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 5 d", letter = "(a)")
+#2. From plots...
+# arl.results <- avg.run.length(data = ss["2018-01-29 12:00:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 5 d")
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 7 day/ss.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+# ADPCA::graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/7 day SS", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 7 d", letter = "(b)")
+# 2. From plots, SPE false alarms prior to 12:40 pm
+# arl.results <- rbind(arl.results, avg.run.length(data = ss["2018-01-29 12:40:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 7 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 10 day/ss.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+# ADPCA::graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], keyword = "images/10 day SS", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 10 d", letter = "(c)")
+# 2. From plots, SPE false alarms prior to 12:40 pm
+# arl.results <- rbind(arl.results, avg.run.length(data = ss["2018-01-29 12:00:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 10 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+##### Pump failure - BR #####
+
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+
+
+load("results/Jan 2018 5 day/br.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+ADPCA::graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/5 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 5 d", letter = "(d)")
+
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-29 12:00:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 5 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 7 day/br.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+# ADPCA::graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/7 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 7 d", letter = "(e)")
+# 2. From plots, SPE false alarms prior to 12:40 pm
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-29 12:40:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 7 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 10 day/br.RData")
+# 1. Plot
+# cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+# ADPCA::graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], keyword = "images/10 day BR", w = 11, h = 3, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, filetype = "png")
+graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 10 d", letter = "(f)")
+# 2. From plots, SPE false alarms prior to 12:40 pm
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-29 12:00:00/"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 10 d"))
+# 3. Compare results
+# print(arl.results[,-c(3,4)]) # High SPE false alarms
+
+legend(x="bottomleft", 
+       inset = c(-1.3,-.8),
+       legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+       col = c("black", "red", "orange", "purple","blue", "red"),
+       pch = c(16,16,16,16,NA,NA),
+       lty = c(NA,NA,NA,NA,1,2),
+       bty = "n",
+       xpd=NA, 
+       horiz = TRUE)
+
+dev.off()
+}
+
+setwd("C:/Users/Kate Newhart/Dropbox/Newhart ADPCA Paper/R/")
+
+# Influent overdose
+{
+trueFaultTime <- as.POSIXct("2018-01-18 09:49:56 MST") # Begin dosing
+trueAlarmTime <- as.POSIXct("2018-01-18 10:21:57 MST") # Level > 7.5
+
+png("poster/influent overdose.png", units = "in", res = 2000, width = 6.5/2*3, height = 4.5)
+par(mfcol=c(3,3), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+
+
+load("results/Jan 2018 5 day/ss.RData")
+# 1. Plot
+# cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/5 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 5 d", letter = "(a)")
+#2. From plots...
+# arl.results <- avg.run.length(data = ss["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 5 d")
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 7 day/ss.RData")
+# 1. Plot
+# cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/7 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 7 d", letter = "(b)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = ss["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 7 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 10 day/ss.RData")
+# 1. Plot
+# cols <- c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_2.TSS.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+plot.data <- ss["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# colnames(plot.data) <- c("BIO_1.LEVEL.PROCESS_VALUE", "MBR_2.TSS.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/10 day SS", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 10 d", letter = "(c)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = ss["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "SSAD-PCA 10 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+##### Influent overdose - BR #####
+
+load("results/Jan 2018 5 day/br.RData")
+# 1. Plot
+# cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_2.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+plot.data <- br["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# colnames(plot.data) <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/5 day BR", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 5 d", letter = "(d)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 5 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 7 day/br.RData")
+# 1. Plot
+# cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_2.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+plot.data <- br["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# colnames(plot.data) <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/7 day BR", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 7 d", letter = "(e)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 7 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 10 day/br.RData")
+# 1. Plot
+# cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+cols <-  c("BIO_2.LEVEL.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+plot.data <- br["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+# colnames(plot.data) <-  c("BIO_1.LEVEL.PROCESS_VALUE", "BIO_BLOWER_1.FLOW.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/10 day BR", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 10 d", letter = "(f)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = br["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA SBR 10 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+
+###### Influent overdose - MT #####
+
+load("results/Jan 2018 5 day/mt.RData")
+# 1. Plot
+# cols <- c("BIO_1.TSS.PROCESS_VALUE", "MBR_1.INF_FLOW.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_2.TSS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+plot.data <- mt["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+colnames(plot.data) <- c("MBR_2.TSS.PROCESS_VALUE", "Alarm")
+# colnames(plot.data) <- c("MBR_1.TSS.PROCESS_VALUE", "MBR_1.INF_FLOW.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/5 day MT", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 5 d", letter = "(g)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = mt["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA MBR 5 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+load("results/Jan 2018 7 day/mt.RData")
+# 1. Plot
+# cols <-  c("BIO_1.TSS.PROCESS_VALUE", "MBR_1.INF_FLOW.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_2.TSS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+plot.data <- mt["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+colnames(plot.data) <- c("MBR_2.TSS.PROCESS_VALUE", "Alarm")
+# colnames(plot.data) <- c("MBR_1.TSS.PROCESS_VALUE", "MBR_1.INF_FLOW.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/7 day MT", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 7 d", letter = "(h)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = mt["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA MBR 7 d"))
+# 3. Compare results
+# print(arl.results)
+
+
+
+load("results/Jan 2018 10 day/mt.RData")
+# 1. Plot
+# cols <- c("BIO_1.TSS.PROCESS_VALUE", "MBR_1.INF_FLOW.PROCESS_VALUE", "Alarm")
+cols <- c("BIO_2.TSS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+plot.data <- mt["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n]
+colnames(plot.data) <- c("MBR_2.TSS.PROCESS_VALUE", "Alarm")
+# colnames(plot.data) <- c("MBR_1.TSS.PROCESS_VALUE", "MBR_2.TSS.PROCESS_VALUE", "Alarm")
+# ADPCA::graph_alarmData(data = plot.data, keyword = "images/10 day MT", w = 6, h = 2, filetype = "png", inset.delta = -.15, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime)
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 10 d", letter = "(i)")
+#2. From plots...
+# arl.results <- rbind(arl.results, avg.run.length(data = mt["2018-01-18 05:00:00/2018-01-18 20:00:00"], t.oc = trueFaultTime, t.scada.alarm = trueAlarmTime, string = "MSAD-PCA MBR 10 d"))
+# 3. Compare results
+# print(arl.results)
+
+legend(x="bottomleft", 
+       inset = c(-2,-.8),
+       legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+       col = c("black", "red", "orange", "purple","blue", "red"),
+       pch = c(16,16,16,16,NA,NA),
+       lty = c(NA,NA,NA,NA,1,2),
+       bty = "n",
+       xpd=NA, 
+       horiz = TRUE)
+
+dev.off()
+}
+
+# Membrane failure
+{
+trueFaultTime <- as.POSIXct("2018-08-27 13:00:00 MST")
+trueAlarmTime <- as.POSIXct("2018-08-28 20:13:59 MDT")
+plot.range <- "2018-08-23/"
+png("poster/mbr failure.png", units = "in", res = 2000, width = 6.5, height = 5)
+par(mfrow=c(3,1), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+
+load("results/Aug 2018 3 day/ss.RData")
+plot.data <- ss
+cols <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+plot.data <- plot.data[plot.range,n]
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 3 d", letter = "(a)")
+
+
+
+load("results/Aug 2018 5 day/ss.RData")
+plot.data <- ss
+cols <- c("MBR_1.TRANS_PRESS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+plot.data <- plot.data[plot.range,n]
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 5 d", letter = "(b)")
+
+
+
+load("results/Aug 2018 7 day/ss.RData")
+plot.data <- ss
+cols <- c("RAS_TROUGH.TSS.PROCESS_VALUE", "Alarm")
+n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+plot.data <- plot.data[plot.range,n]
+graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "SSAD-PCA / 7 d", letter = "(c)")
+
+
+legend(x="bottom", 
+       inset = c(-1.25,-.65),
+       legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+       col = c("black", "red", "orange", "purple","blue", "red"),
+       pch = c(16,16,16,16,NA,NA),
+       lty = c(NA,NA,NA,NA,1,2),
+       bty = "n",
+       xpd=NA, 
+       horiz = TRUE)
+
+dev.off()
+}
+# NO ALARMS
+# load("results/Aug 2018 3 day/br.RData")
+# plot.data <- br
+# 
+# cols <- c("RAS_TROUGH.TSS.PROCESS_VALUE", "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 3 d", letter = "(d)")
+# 
+# 
+# 
+# load("results/Aug 2018 5 day/br.RData")
+# plot.data <- br
+# 
+# cols <- c("RAS_TROUGH.TSS.PROCESS_VALUE", "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 5 d", letter = "(e)")
+# 
+# 
+# 
+# load("results/Aug 2018 7 day/br.RData")
+# plot.data <- br
+# 
+# cols <- c("RAS_TROUGH.TSS.PROCESS_VALUE", "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA SBR / 7 d", letter = "(f)")
+# 
+# 
+# 
+# load("results/Aug 2018 3 day/ss.RData")
+# plot.data <- ss
+# 
+# cols <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE",  "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# plot.data[,2] <- rep(0, nrow(plot.data))
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 3 d", letter = "(g)")
+# 
+# 
+# 
+# load("results/Aug 2018 5 day/ss.RData")
+# plot.data <- ss
+# 
+# cols <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE",  "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# plot.data[,2] <- rep(0, nrow(plot.data))
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 5 d", letter = "(h)")
+# 
+# 
+# 
+# load("results/Aug 2018 7 day/ss.RData")
+# plot.data <- ss
+# 
+# cols <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE",  "Alarm")
+# n <- as.numeric(sapply(cols, function(x) which(colnames(plot.data) == x)))
+# plot.data <- plot.data[plot.range,n]
+# plot.data[,2] <- rep(0, nrow(plot.data))
+# 
+# par(mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+# graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = "MSAD-PCA MBR / 7 d", letter = "(i)")
+#  
+
+```
