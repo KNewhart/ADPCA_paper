@@ -8,8 +8,19 @@ institute: Colorado School of Mines
 # Data compiling
 ```{r Case Study Data Compiler, message=FALSE, warning=FALSE, include=FALSE}
 rm(list=ls())
+library(mvMonitoringv2)
 library(ADPCA)
-case_study_data_compiler <- function(keyword, testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days, rollingWindowDays, testMT = TRUE, alphaN = 0.01) {
+
+keyword = "testing"
+testingDay = as.Date("2018 01 01", format = "%Y %m %d")
+days = 7
+rollingWindowDays = 7
+testMT = TRUE
+alphaN = 0.01
+statistic = "T2"
+by = 1000
+
+case_study_data_compiler <- function(keyword = "testing", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 14, rollingWindowDays = 7, testMT = TRUE, alphaN = 0.01, statistic = "T2", by = "Time") {
 
 # keyword = Data file label
 # testingDay = Date to be evaluated with ADPCA model
@@ -18,8 +29,6 @@ case_study_data_compiler <- function(keyword, testingDay = as.Date("2018 01 01",
 # Install ADPCA package
 # devtools::install_github("KNewhart/ADPCA")
 
-
-
 # Number of times model is updated 
 updateDays <- rollingWindowDays
 
@@ -27,7 +36,7 @@ updateDays <- rollingWindowDays
 nDays <- rollingWindowDays + updateDays
 
 # Set working directory (where results files should be saved)
-wd <- "C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R"
+wd <- "C:/Users/Kate Newhart/Dropbox/Newhart ADPCA Paper/R"
 setwd(wd)
 
 # Alpha value for statistical analysis
@@ -109,6 +118,7 @@ just.alarms <- list()
 testingDay.org <- testingDay
 # Set true or false: enough data to test membranes?
 
+i <- 1
 
 for (i in 1:days) {
   
@@ -193,7 +203,9 @@ for (i in 1:days) {
                                      testingDay = testingDay,
                                      rollingWindowDays = rollingWindowDays,
                                      alphaN = alphaN,
-                                     faultsToTriggerAlarm = faultsToTriggerAlarm)
+                                     faultsToTriggerAlarm = faultsToTriggerAlarm,
+                                     statistic = statistic,
+                                     by = by)
   if (testMT) {
     trainingDataMT <- multistate_train(rawData = rawData[index.mt],
                                        vars = varsMT,
@@ -201,14 +213,18 @@ for (i in 1:days) {
                                        testingDay = testingDay,
                                        rollingWindowDays = rollingWindowDays,
                                        alphaN = alphaN,
-                                       faultsToTriggerAlarm = faultsToTriggerAlarm)
+                                       faultsToTriggerAlarm = faultsToTriggerAlarm,
+                                       statistic = statistic,
+                                       by=by)
   }
   
   trainingDataSS <- createTrainingSpecs(data = uniqueData[index.ss],
                                         testingDay = testingDay,
                                         rollingWindowDays = rollingWindowDays,
                                         alpha = alphaN,
-                                        faultsToTriggerAlarm = faultsToTriggerAlarm)
+                                        faultsToTriggerAlarm = faultsToTriggerAlarm,
+                                        statistic = statistic,
+                                        by = by)
   
   save(trainingDataBR, file = "trainingDataBR.R")
   if (testMT) save(trainingDataMT, file = "trainingDataMT.R")
@@ -251,43 +267,7 @@ for (i in 1:days) {
                             trainingSpecs = trainingDataSS,
                             testingDay = testingDay,
                             faultsToTriggerAlarm = faultsToTriggerAlarm)
-# Contribution plot 
-  {
-  # if (i == 1) {
-  #   mu.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, mean)[-1]
-  #   sd.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, stats::sd)[-1]
-  #   vars.SS <- colnames(trainingDataSS$Non_Alarmed_Obs)[-1]
-  #   vars.SS <- gsub("[.]", "\\\\", vars.SS)
-  #   
-  #   alarmDataSS.standardized.iterate <- rawData[paste0(testingDay,"/")][,(colnames(rawData) %in% vars.SS)]
-  #   
-  #   for (l in 1:(ncol(alarmDataSS.standardized.iterate))) {
-  #     
-  #     alarmDataSS.standardized.iterate[,l] <- (alarmDataSS.standardized.iterate[,l] - mu.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])])/sd.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])]
-  #     
-  #   }
-  #   
-  #   alarmDataSS.standardized <- as.data.frame(alarmDataSS.standardized.iterate)
-  #   
-  # } 
-  # 
-  # if (i != 1) {
-  #   mu.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, mean)[-1]
-  #   sd.SS <- apply(trainingDataSS$Non_Alarmed_Obs, 2, stats::sd)[-1]
-  #   vars.SS <- colnames(trainingDataSS$Non_Alarmed_Obs)[-1]
-  #   vars.SS <- gsub("[.]", "\\\\", vars.SS)
-  #   
-  #   alarmDataSS.standardized.iterate <- rawData[paste0(testingDay,"/")][,(colnames(rawData) %in% vars.SS)]
-  #   
-  #   for (l in 1:(ncol(alarmDataSS.standardized.iterate))) {
-  #     
-  #     alarmDataSS.standardized.iterate[,l] <- (alarmDataSS.standardized.iterate[,l] - mu.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])])/sd.SS[which(vars.SS == colnames(alarmDataSS.standardized.iterate)[l])]
-  #     
-  #   }
-  #   
-  #   alarmDataSS.standardized <- fastmerge(alarmDataSS.standardized, as.data.frame(alarmDataSS.standardized.iterate))
-  # }
-}
+
   
   # Test multistate
   alarmDataBR <- multistate_test(data = filtered.dataBR_ls,
@@ -401,44 +381,81 @@ if (testMT) {
   # graph_alarmData(data = mt, keyword = "results/continuous MT")
 } 
 }
+
+
 ```
 
 ```{r Aug 2018 3 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Aug 2018", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 3, testMT = FALSE)
+case_study_data_compiler(keyword = "Aug 2018 T2", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 3, testMT = FALSE, statistic = "T2") # RUN
+case_study_data_compiler(keyword = "Aug 2018 SPE", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, 
+                         rollingWindowDays = 3, testMT=FALSE, statistic = "SPE") #RUN
 ```
 
 ```{r Aug 2018 5 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Aug 2018", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 5, testMT = FALSE)
+case_study_data_compiler(keyword = "Aug 2018 T2", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 5, testMT = FALSE, statistic = "T2") # RUN
+case_study_data_compiler(keyword = "Aug 2018 SPE", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, 
+                         rollingWindowDays =5, testMT=FALSE, statistic = "SPE") 
 ```
 
 ```{r Aug 2018 7 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Aug 2018", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 7, testMT = FALSE)
+case_study_data_compiler(keyword = "Aug 2018 T2", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, rollingWindowDays = 7, testMT = FALSE, statistic = "T2") # RUN
+case_study_data_compiler(keyword = "Aug 2018 SPE", testingDay = as.Date("2018 08 15", format = "%Y %m %d"), days = 17, 
+                         rollingWindowDays = 7, testMT=FALSE, statistic = "SPE") #
 ```
 
-```{r Aug 2018 10 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-# case_study_data_compiler(keyword = "Aug", testingDay = as.Date("2018 08 14", format = "%Y %m %d"), days = 13, rollingWindowDays = 10)
-# Error in eigen(R) : infinite or missing values in 'x'
-```
 
-```{r Jan 2018 3 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Jan 2018", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 3)
-```
+```{r Jan 2018 10 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+case_study_data_compiler(keyword = "Jan 2018 T2", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "T2")
+case_study_data_compiler(keyword = "Jan 2018 SPE", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "SPE")
 
-```{r Jan 2018 5 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Jan 2018", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5)
-# case_study_data_compiler(keyword = "Jan", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, testMT = FALSE)
-```
+case_study_data_compiler(keyword = "Jan 2018 T2", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "T2")
+case_study_data_compiler(keyword = "Jan 2018 SPE", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "SPE")
 
-```{r Jan 2018 7 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Jan 2018", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7)
+case_study_data_compiler(keyword = "Jan 2018 T2", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "T2", testMT=FALSE)
+case_study_data_compiler(keyword = "Jan 2018 SPE", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "SPE", testMT=FALSE)
 ```
 
 ```{r Jan 2018 10 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Jan 2018", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10)
+case_study_data_compiler(keyword = "Jan 2018 T2 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "T2", by = 500, testMT = FALSE)
+case_study_data_compiler(keyword = "Jan 2018 SPE 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "SPE", by = 500, testMT = FALSE)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "T2", by = 1000, testMT = FALSE) 
+case_study_data_compiler(keyword = "Jan 2018 SPE 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "SPE", by = 1000, testMT = FALSE)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "T2", by = 1500, testMT = FALSE)
+case_study_data_compiler(keyword = "Jan 2018 SPE 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 5, statistic = "SPE", by = 1500, testMT = FALSE)
+
+
+case_study_data_compiler(keyword = "Jan 2018 T2 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "T2", by = 500)
+case_study_data_compiler(keyword = "Jan 2018 SPE 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "SPE", by = 500)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "T2", by = 1000) 
+case_study_data_compiler(keyword = "Jan 2018 SPE 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "SPE", by = 1000)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "T2", by = 1500)
+case_study_data_compiler(keyword = "Jan 2018 SPE 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7, statistic = "SPE", by = 1500)
+
+
+case_study_data_compiler(keyword = "Jan 2018 T2 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "T2", by = 500)
+case_study_data_compiler(keyword = "Jan 2018 SPE 500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "SPE", by = 500)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "T2", by = 1000) 
+case_study_data_compiler(keyword = "Jan 2018 SPE 1000", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "SPE", by = 1000)
+
+case_study_data_compiler(keyword = "Jan 2018 T2 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "T2", by = 1500)
+case_study_data_compiler(keyword = "Jan 2018 SPE 1500", testingDay = as.Date("2018 01 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 10, statistic = "SPE", by = 1500)
 ```
 
+
 ```{r Feb 2018 3 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Feb 2018", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 3)
+case_study_data_compiler(keyword = "Feb 2018 T2", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 10, statistic = "T2")
+case_study_data_compiler(keyword = "Feb 2018 SPE", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 10, statistic = "SPE")
+
+case_study_data_compiler(keyword = "Feb 2018 T2", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 7, statistic = "T2")
+case_study_data_compiler(keyword = "Feb 2018 SPE", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 7, statistic = "SPE")
+
+case_study_data_compiler(keyword = "Feb 2018 T2", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 5, statistic = "T2", testMT = FALSE)
+case_study_data_compiler(keyword = "Feb 2018 SPE", testingDay = as.Date("2018 02 01", format = "%Y %m %d"), days = 28, rollingWindowDays = 5, statistic = "SPE", testMT = FALSE)
 ```
 
 ```{r Feb 2018 5 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
@@ -460,7 +477,7 @@ case_study_data_compiler(keyword = "Mar 2018", testingDay = as.Date("2018 03 01"
 ```
 
 ```{r Mar 2018 7 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-case_study_data_compiler(keyword = "Mar 2018", testingDay = as.Date("2018 03 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7)
+case_study_data_compiler(keyword = "Mar 2018", testingDay = as.Date("2018 03 01", format = "%Y %m %d"), days = 31, rollingWindowDays = 7) # Error in eigen(R) : infinite or missing values in 'x'
 ```
 
 ```{r Mar 2018 10 day, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
@@ -1218,7 +1235,8 @@ graph_alarmData <- function (data,
              main = "",
              pch = 20,
              #col = "black")
-             col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+             # col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+             col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "red", "red"))))
         if (r.hours > 49) {
           axis.POSIXct(1, at = seq(r[1], r[2], by = "days"), cex.axis = 1, format = "%m/%d")
         } else {
@@ -1264,7 +1282,8 @@ graph_alarmData <- function (data,
                main = "",
                pch = 20,
                #col = "black")
-               col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+               # col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+             col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "red", "red"))))
 
           # line.ewma <- ewma(data[,i], n = 1440, alpha = 0.01)
           # points(x = index(line.ewma),
@@ -1311,7 +1330,8 @@ graph_alarmData <- function (data,
                main = "",
                pch = 20,
                #col = "black")
-               col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+               # col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "orange", "purple"))))
+             col = ifelse(alarms == 0, "black", ifelse (alarms == 1, "red", ifelse (alarms == 2, "red", "red"))))
 
           # line.ewma <- ewma(data[,i])
           # line(x = index(line.ewma),
@@ -1367,14 +1387,204 @@ graph_alarmData <- function (data,
 
 # Pump failure
 ```{r}
+
 trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
 trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
 windowsFonts(A = windowsFont("Times New Roman"))
-png("images/testing.png", units = "in", res = 300, width = 6.5, height = 8/2, family = "A")
+
+folder.paths <- list.dirs()[grep("results/Jan 2018 SPE",list.dirs())]
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(length(folder.paths)/2,2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/ss.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+  graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+
+
+folder.paths <- list.dirs()[grep("results/Jan 2018 T2",list.dirs())]
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/ss.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+  graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+
+folder.paths <- list.dirs()[grep("results/Jan 2018 SPE",list.dirs())]
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/br.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+  graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+folder.paths <- list.dirs()[grep("results/Jan 2018 T2",list.dirs())]
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/br.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+  graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+## BR
+# SPE has high false alarm rate
+# T2 detects prior to system alarm
+folder.paths <- c("./results/Jan 2018 SPE 5 day", 
+                  "./results/Jan 2018 SPE 7 day", 
+                  "./results/Jan 2018 SPE 10 day",
+                  "./results/Jan 2018 T2 5 day", 
+                  "./results/Jan 2018 T2 7 day", 
+                  "./results/Jan 2018 T2 10 day")
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/br.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+  graph_alarmData(data = br["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+## SS
+# Even more false alarms in SPE than in BR
+# T2 detects fault sooner than in BR
+folder.paths <- c("./results/Jan 2018 SPE 5 day", 
+                  "./results/Jan 2018 SPE 7 day", 
+                  "./results/Jan 2018 SPE 10 day",
+                  "./results/Jan 2018 T2 5 day", 
+                  "./results/Jan 2018 T2 7 day", 
+                  "./results/Jan 2018 T2 10 day")
+png("images/testing.png", units = "in", res = 300, width = 15, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/ss.RData"))
+  cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+  graph_alarmData(data = ss["2018-01-29/2018-01-29"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+## Influent overdose
+## SS
+# SPE at 5 & 7 days has same response as T2
+# T2 at 10 days has stronger response
+trueFaultTime <- as.POSIXct("2018-01-18 09:49:56 MST") # Begin dosing
+trueAlarmTime <- as.POSIXct("2018-01-18 10:21:57 MST") # Level > 7.5
+windowsFonts(A = windowsFont("Times New Roman"))
+folder.paths <- c("./results/Jan 2018 SPE 5 day", 
+                  "./results/Jan 2018 SPE 7 day", 
+                  "./results/Jan 2018 SPE 10 day",
+                  "./results/Jan 2018 T2 5 day", 
+                  "./results/Jan 2018 T2 7 day", 
+                  "./results/Jan 2018 T2 10 day")
+png("images/testing.png", units = "in", res = 300, width = 2*6.5, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/ss.RData"))
+  cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+  graph_alarmData(data = ss["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+## BR
+# Not as strong of a response for either T2 or SPE
+# Weakest response in 5 days, strongest in 10 days
+png("images/testing.png", units = "in", res = 300, width = 2*6.5, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/br.RData"))
+  cols <-  c("BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+  graph_alarmData(data = br["2018-01-18 05:00:00/2018-01-18 20:00:00"][,n], trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+
+
+
+## Sensor Fault
+trueFaultTime <- as.POSIXct("2018-01-05 09:14:00 MST")
+trueAlarmTime <- as.POSIXct("2018-01-05 10:56:00 MST")
+windowsFonts(A = windowsFont("Times New Roman"))
+folder.paths <- c("./results/Jan 2018 SPE 5 day", 
+                  "./results/Jan 2018 SPE 7 day", 
+                  "./results/Jan 2018 SPE 10 day",
+                  "./results/Jan 2018 T2 5 day", 
+                  "./results/Jan 2018 T2 7 day", 
+                  "./results/Jan 2018 T2 10 day")
+png("images/testing.png", units = "in", res = 300, width = 2*6.5, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/ss.RData"))
+  cols <-  c("BIO_1.TSS.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(ss) == x)))
+  plot.data <- ss["2018-01-05 06:00:00/2018-01-05 13:00:00"][,n]
+  colnames(plot.data) <- c("MBR_1.TSS.PROCESS_VALUE", "Alarm")
+  graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+# BR
+png("images/testing.png", units = "in", res = 300, width = 2*6.5, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  load(paste0(i,"/br.RData"))
+  cols <-  c("BIO_BLOWER_2.FLOW.PROCESS_VALUE", "Alarm")
+  n <- as.numeric(sapply(cols, function(x) which(colnames(br) == x)))
+  plot.data <- br["2018-01-05 06:00:00/2018-01-05 13:00:00"][,n]
+  graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+
+}
+dev.off()
+
+#MT
+png("images/testing.png", units = "in", res = 300, width = 2*6.5, height = 8, family = "A")
+par(mfcol=c(round(length(folder.paths)/2),2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
+for(i in folder.paths) {
+  if(file.exists(paste0(i,"/mt.RData"))) {
+    load(paste0(i,"/mt.RData"))
+    cols <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+    n <- as.numeric(sapply(cols, function(x) which(colnames(mt) == x)))
+    plot.data <- mt["2018-01-05 06:00:00/2018-01-05 13:00:00"][,n]
+    colnames(plot.data) <- c("PERM_CONDUCTIVITY.PROCESS_VALUE", "Alarm")
+    graph_alarmData(data = plot.data, trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = substr(i, 11,nchar(i)))
+  }
+}
+dev.off()
+
+
+
+
+
+
+
 par(mfcol=c(3,2), mar = c(2.1, 3.1, 3.6, 0.6), oma = c(2,0,0,0))
 
 ##### Pump failure - SS #####
-load("results/Jan 2018 5 day/ss.RData")
+load("results/Jan 2018 SPE 1500 5 day/ss.RData")
 # 1. Plot
 # cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "BIO_1.LEVEL.PROCESS_VALUE", "Alarm")
 cols <- c("SEWAGE.LEVEL.PROCESS_VALUE", "Alarm")

@@ -1,0 +1,730 @@
+# Load packages
+```{r include=FALSE}
+rm(list=ls())
+setwd("C:/Users/Kate Newhart/Dropbox/Newhart ADPCA Paper/R")
+packages <- c("mvMonitoringv2", "ADPCA", "lubridate")
+lapply(packages, library, character.only = TRUE)
+```
+# Graphing functions
+```{r plotTimeseries}
+plotTimeseries <- function(data1) {
+
+label1 <- colnames(data1)
+
+r1 <- range(index(data1)[which(!is.na(data1))])[1]
+r2 <- range(index(data1)[which(!is.na(data1))])[2]
+
+data2plot <- na.omit(data1)[paste0(r1,"/",r2)]
+data2plot <- data.frame(data2plot, row.names = as.character(index(data2plot)))
+data2plot <- cbind(data2plot, as.numeric(difftime(as.POSIXct(rownames(data2plot)), as.POSIXct(rownames(data2plot)[1]),units = "days")))
+
+par(mar=c(3.1,4.1,2.1,2.1))
+plot(x = data2plot[,ncol(data2plot)], y = data2plot[,1], type = "p", pch = 20, col = "black", xaxt = "n", xlab = "", ylab = "", yaxt="n")
+axis(side = 2)
+mtext(side = 2, label1, line = 2.5)
+
+# x-axis
+axis.ticks <- seq(0,round(data2plot[nrow(data2plot),ncol(data2plot)]), by = 10)
+axis.labels <- sapply(axis.ticks, function(x) which(x > data2plot[,ncol(data2plot)]))
+axis.labels <- sapply(axis.labels, function(x) x[length(x)])
+axis.labels[[1]] <- 1
+axis.labels <- as.numeric(unlist(axis.labels))
+axis(side = 1, at = axis.ticks, labels = format(as.POSIXct(rownames(data2plot)[axis.labels]), "%m/%d"))
+}
+```
+```{r plotFaults}
+plotFaults <- function(data, plotTime = NULL, vars2plot = NULL, title = NULL, trueFaultTime = NULL, trueAlarmTime = NULL, label = NULL, inset = c(0,0), text.width=c(.5,1,1,1.25,1.5,2.25), cex.norm = 1) {
+library(xts)
+  
+# Subset data
+if(is.null(vars2plot)) vars2plot <- grep("PROCESS_VALUE", colnames(data))
+if(is.character(vars2plot)) vars2plot <- sapply(vars2plot, function(x) which(colnames(data) == x))
+
+
+# Set x axis range
+if (is.null(plotTime)) { # If it was not set initially, use all data
+  r1 <- range(index(data))[1]
+  r2 <- range(index(data))[2]
+} else { # Parse string
+  r1 <- as.POSIXct(substr(plotTime, 1,10))
+  r2 <- as.POSIXct(substr(plotTime, 12, 21))
+}
+
+
+# Get data ready to plot
+data2plot <- na.omit(data)[paste0(r1,"/",r2)]
+data2plot <- data.frame(data2plot[,c(vars2plot,(ncol(data)-1),ncol(data))], row.names = as.character(index(data2plot)))
+colnames(data2plot) <- sapply(colnames(data2plot), function(x) unlist(strsplit(x, "PROCESS_VALUE"))[1])
+colnames(data2plot) <- gsub("[.]", " ", colnames(data2plot))
+colnames(data2plot) <- gsub("[_]", " ", colnames(data2plot))
+
+
+# Timestamps
+if(as.numeric(difftime(r2,r1, units="days")) < 2) {
+  timestamp <- as.numeric(difftime(as.POSIXct(rownames(data2plot)), as.POSIXct(rownames(data2plot)[1]),units = "hours"))
+} else {
+  timestamp <- as.numeric(difftime(as.POSIXct(rownames(data2plot)), as.POSIXct(rownames(data2plot)[1]),units = "days"))
+}
+
+data2plot <- cbind(data2plot, timestamp)
+
+alarmed.obs.spe <- which(data2plot[,"SPE Alarm"] != 0)
+alarmed.obs.t2 <- which(data2plot[,"T2 Alarm"] != 0)
+alarmed.obs.both <- intersect(alarmed.obs.spe, alarmed.obs.t2)
+
+# Plot it
+{
+if(!is.null(title)) par(mar=c(3.1,3.1,1.1,1.1), oma=c(1.5,0,2,0))
+if(is.null(title)) par(mar=c(3.1,3.1,1.1,1.1), oma=c(1.5,0,0,0))
+par(mfrow=c(ncol(data2plot)-3,1), cex.axis=cex.norm, cex.lab=cex.norm, cex.main=cex.norm, cex.sub=cex.norm)
+colnames(data2plot) <- sapply(colnames(data2plot), function(x) paste0(toupper(substr(x,1,1)), tolower(substr(x,2,nchar(x)))))
+for(i in 1:(ncol(data2plot)-3)) {
+  plot(x = data2plot[,ncol(data2plot)], y = data2plot[,i], type = "p", pch = 20, col = "black", xaxt = "n", xlab = "", ylab = "", yaxt="n")
+  points(x = data2plot[alarmed.obs.spe,ncol(data2plot)], y = data2plot[alarmed.obs.spe,i], type = "p", pch = 20, col = "orange")
+  points(x = data2plot[alarmed.obs.t2,ncol(data2plot)], y = data2plot[alarmed.obs.t2,i], type = "p", pch = 20, col = "purple")
+  points(x = data2plot[alarmed.obs.both,ncol(data2plot)], y = data2plot[alarmed.obs.both,i], type = "p", pch = 20, col = "red")
+  axis(side = 2, cex = cex.norm)
+  if (!is.null(trueFaultTime)) {
+    x <- which(as.POSIXct(rownames(data2plot)) == trueFaultTime)
+    abline(v=timestamp[x], col="blue", lty = 1)
+  }
+  if (!is.null(trueAlarmTime)) {
+    x <- which(as.POSIXct(rownames(data2plot)) == trueAlarmTime)
+    abline(v=timestamp[x], col="red", lty = 2)
+  }
+  
+  mtext(side = 3, colnames(data2plot)[i], line = .5, cex = cex.norm)
+  
+  if((!is.null(title)) && (i == 1)) mtext(side = 3, text = title, font=2,line =2, cex = cex.norm)
+  if((!is.null(label)) && (i == 1)) mtext(side = 3, text = label, font=2,line =0, adj = .035, outer = TRUE, cex = cex.norm)
+
+  
+  # x-axis
+  if(as.numeric(difftime(r2,r1, units="days")) > 2) {
+    axis.ticks <- seq(0,round(data2plot[nrow(data2plot),ncol(data2plot)]), length.out = as.numeric(difftime(r2,r1, units="days")))
+  } else {
+    axis.ticks <- seq(0,round(data2plot[nrow(data2plot),ncol(data2plot)]), length.out = 6)
+  }
+  axis.labels <- sapply(axis.ticks, function(x) which(x > data2plot[,ncol(data2plot)]))
+  axis.labels <- sapply(axis.labels, function(x) x[length(x)])
+  axis.labels[[1]] <- 1
+  axis.labels <- as.numeric(unlist(axis.labels))
+  if(as.numeric(difftime(r2,r1, units="days")) < 2) {
+    if(substr(format(as.POSIXct(rownames(data2plot)[axis.labels]), "%H:%M")[2],4,5) == "59") {
+          axis.labels <- c(format(as.POSIXct(rownames(data2plot)[axis.labels[1]]), "%H:%M"), format(as.POSIXct(rownames(data2plot)[axis.labels[2:length(axis.labels)]])+60, "%H:%M"))
+    } else {
+      axis.labels <- format(as.POSIXct(rownames(data2plot)[axis.labels]), "%H:%M")
+    }
+  } else {
+    axis.labels <- format(as.POSIXct(rownames(data2plot)[axis.labels]), "%m/%d")
+  }
+      axis(side = 1, at = axis.ticks, labels = axis.labels)
+}
+
+# Plot key
+legend(x="bottomleft", 
+       inset = inset, 
+       legend = c("IC", "T2", "SPE", "Both","Fault Occurred", "System Alarm"),
+       col = c("black", "purple", "orange", "red","blue", "red"),
+       pch = c(16,16,16,16,NA,NA),
+       text.width=text.width,
+       lty = c(NA,NA,NA,NA,1,2),
+       bty = "n",
+       xpd=NA, 
+       horiz = TRUE,
+       cex = .8*cex.norm)
+
+
+}
+}
+```
+# Analysis functions
+```{r}
+real.alarms.mt <- c(interval(as.POSIXct("2018-01-05 09:14"),as.POSIXct("2018-01-05 10:56")), interval(as.POSIXct("2018-01-08 19:57:47"),as.POSIXct("2018-01-08 19:58:48")),  
+                 interval(as.POSIXct("2018-01-11 11:57:11"),as.POSIXct("2018-01-11 12:48:13"))) # Membrane shutdown
+real.alarms.mt <- c(real.alarms.mt, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms.br <- c(interval("2018-01-29 14:44:31","2018-01-30 13:58:19")) # Septic pump shutdown
+# What do consider the flow correction? 
+real.alarms.br <- c(real.alarms.br, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms.mt <- c(real.alarms.mt, interval("2018-01-25 08:03:03","2018-01-29 14:44:00")) # Flow correction
+real.alarms.ss <- c(real.alarms.mt, real.alarms.br)
+
+# False-detection rate (FDR)
+# alarms are signaled when they should not be signaled
+# Alarmed IC / IC obs
+alarm.rate.calc <- function (data, real.alarms) {
+  t2.col <- grep("T2", colnames(data))
+  alarmed.t2.obs <- which(data[,t2.col] == 1)
+  alarmed.t2.obs <- c(alarmed.t2.obs, which(data[,t2.col] == 3))
+  
+  nonalarmed.t2.obs <- which(data[,t2.col] == 0)
+  nonalarmed.t2.obs <- c(nonalarmed.t2.obs, which(data[,t2.col] == 2))
+  
+  spe.col <- grep("SPE", colnames(data))
+  alarmed.spe.obs <- which(data[,spe.col] == 2)
+  alarmed.spe.obs <- c(alarmed.spe.obs, which(data[,spe.col] == 3))
+  
+  nonalarmed.spe.obs <- which(data[,spe.col] == 0)
+  nonalarmed.spe.obs <- c(nonalarmed.spe.obs, which(data[,spe.col] == 1))
+  
+  
+  for(i in 1:length(real.alarms)){
+    oc.i <- which(index(data)  %within% real.alarms[[i]])
+    # oc.obs.n <- round(as.numeric(difftime(int_end(real.alarms[[i]]),int_start(real.alarms[[i]]), units ="mins")))
+    if (i == 1) {
+      oc.obs <- oc.i
+      # oc.total <- oc.obs.n
+    } else {
+      oc.obs <- c(oc.obs, oc.i)
+      # oc.total <- oc.total + oc.obs.n
+    }
+  }
+
+  ic.obs <- which(!index(data) %in% index(data)[oc.obs])
+  
+  alarmed.t2.ic.obs <- which(alarmed.t2.obs %in% ic.obs)
+  fdr.t2 <- length(alarmed.t2.ic.obs)/length(ic.obs)
+  
+  alarmed.spe.ic.obs <- which(alarmed.spe.obs %in% ic.obs)
+  fdr.spe <- length(alarmed.spe.ic.obs)/length(ic.obs)
+    
+  nonalarmed.t2.oc.obs <- which(nonalarmed.t2.obs %in% oc.obs)
+  ficr.t2 <- length(nonalarmed.t2.oc.obs)/length(oc.obs)
+  
+  nonalarmed.spe.oc.obs <- which(nonalarmed.spe.obs %in% oc.obs)
+  ficr.spe <- length(nonalarmed.spe.oc.obs)/length(oc.obs)
+  
+  return(c("FDR-T2" = fdr.t2, 
+           "FDR-SPE" = fdr.spe, 
+           "FICR-T2" = ficr.t2, 
+           "FICR-SPE" = ficr.spe))
+}
+```
+
+
+# Detection rates
+```{r}
+# Load data
+load("results/Jan 2018 SPE 5 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 5 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+alarm.stats <- data.frame(alarm.rate.calc(data, real.alarms.ss))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 5 day SS"
+
+
+# Load data
+load("results/Jan 2018 SPE 5 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 5 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.br)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 5 day MS SBR"
+
+
+# Load data
+load("results/Jan 2018 SPE 7 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 7 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.ss)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 7 day SS"
+
+
+# Load data
+load("results/Jan 2018 SPE 7 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 7 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.br)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 7 day MS SBR"
+
+
+# Load data
+load("results/Jan 2018 SPE 7 day/mt.RData")
+data <- mt
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 7 day/mt.RData")
+data <- cbind(data, mt[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(mt)
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.mt)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 7 day MS MBR"
+
+
+# Load data
+load("results/Jan 2018 SPE 10 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 10 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.ss)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 10 day SS"
+
+
+# Load data
+load("results/Jan 2018 SPE 10 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 10 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.br)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 10 day MS SBR"
+
+
+# Load data
+load("results/Jan 2018 SPE 10 day/mt.RData")
+data <- mt
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 10 day/mt.RData")
+data <- cbind(data, mt[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(mt)
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(data, real.alarms.mt)))
+colnames(alarm.stats)[ncol(alarm.stats)] <- "Jan 2018 10 day MS MBR"
+
+barplot.results <- as.matrix(alarm.stats)
+barplot.results <- rbind(barplot.results,
+                          "days" = c(5,5,7,7,7,10,10,10))
+barplot.results <- rbind(barplot.results,
+                         "mode" = c("SS", "MS SBR", "SS", "MS SBR", "MS MBR", "SS", "MS SBR", "MS MBR"))
+barplot(barplot.results[c(1,6),], axisnames = FALSE)
+
+```
+
+
+
+# Case studies
+## Pump failure
+```{r}
+# SBMBR Single
+plotTime <- "2018-01-20/2018-01-29"
+trueFaultTime <- as.POSIXct("2018-01-29 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-29 17:40:37 MST")
+vars2plot <- c("SEWAGE.LEVEL.PROCESS_VALUE",
+               "BIO_1.LEVEL.PROCESS_VALUE")
+label <- "(a)"
+
+# Load data
+load("results/Jan 2018 SPE 5 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 5 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 5 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, text.width = c(.5,1,1,1.25,1.5,2.25))
+
+
+
+# SBR Multistate
+label <- "(b)"
+
+# Load data
+load("results/Jan 2018 SPE 5 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 5 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "MSAD-PCA / 5 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label)
+
+
+
+
+# Load data
+label <- "(c)"
+load("results/Jan 2018 SPE 1000 10 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 1000 10 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 1000 obs", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, text.width = c(.5,1,1,1.25,1.5,2.25))
+
+
+load("results/Jan 2018 SPE 1000 10 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 1000 10 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "MSAD-PCA / 1000 obs", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, text.width = c(.5,1,1,1.25,1.5,2.25))
+
+
+
+
+label <- "(d)"
+# Load data
+load("results/Jan 2018 SPE 10 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 10 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 10 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, text.width = c(.5,1,1,1.25,1.5,2.25))
+
+
+# Load data
+load("results/Jan 2018 SPE 10 day/br.RData")
+data <- br
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Jan 2018 T2 10 day/br.RData")
+data <- cbind(data, br[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(br)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "MSAD-PCA / 10 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, text.width = c(.5,1,1,1.25,1.5,2.25))
+
+```
+
+
+
+
+
+
+
+
+## Change in influent quality - 1
+```{r}
+plotTime <- "2018-08-23/2018-08-31"
+trueFaultTime <- as.POSIXct("2018-08-27 13:00:00 MST")
+trueAlarmTime <- as.POSIXct("2018-08-28 20:13:59 MDT")
+vars2plot <- c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE", 
+               "MBR_1.TRANS_PRESS.PROCESS_VALUE",
+               "RAS_TROUGH.TSS.PROCESS_VALUE")
+```
+
+## Change in influent quality - 2
+```{r}
+plotTime <- "2018-01-21/2018-01-24"
+trueFaultTime <- as.POSIXct("2018-01-22 12:15:00 MST") 
+trueAlarmTime <- NA 
+vars2plot <- c("BIO_1.DO.PROCESS_VALUE", 
+               "PERMEATE_TANK.TURBIDITY.PROCESS_VALUE", 
+               "PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE")
+```
+
+## Influent overdose
+```{r}
+plotTime <- "2018-01-18 05:00:00/2018-01-18 20:00:00"
+trueFaultTime <- as.POSIXct("2018-01-18 09:49:56 MST") # Begin dosing
+trueAlarmTime <- as.POSIXct("2018-01-18 10:21:57 MST") # Level > 7.5
+vars2plot <- c("BIO_1.LEVEL.PROCESS_VALUE",
+               "BIO_2.LEVEL.PROCESS_VALUE",
+               "BIO_2.TSS.PROCESS_VALUE") # Rename MBR 2 TSS
+```
+
+## A whole lotta faults
+```{r}
+plotTime <- "2018-01-24 16:47:31/2018-01-31"
+vars2plot <- c("SEWAGE.LEVEL.PROCESS_VALUE", 
+               "RAS_TROUGH.TSS.PROCESS_VALUE", 
+               "MBR_1.INF_FLOW.PROCESS_VALUE", 
+               "MBR_1.PERM_FLOW.PROCESS_VALUE",  
+               "PERMEATE_TANK.TURBIDITY.PROCESS_VALUE")
+```
+
+## Slow pump clog
+```{r}
+# trueFaultTime <- as.POSIXct("2018-01-25 08:30 MST")
+trueAlarmTime <- as.POSIXct("2018-01-25 08:30 MST")
+plotTime <- "2018-01-01/2018-01-25 16:00 MST"
+```
+
+
+## Membrane failure
+```{r}
+plotTime <- "2018-08-23/2018-09-01"
+trueFaultTime <- as.POSIXct("2018-08-27 13:00:00 MST")
+trueAlarmTime <- as.POSIXct("2018-08-28 20:13:59 MDT")
+vars2plot <- (c("PERMEATE_TANK.CONDUCTIVITY.PROCESS_VALUE"))
+
+png("poster/membrane_failure_a.png", units = "in", width = 8, height = 3, res = 1000)
+
+# SSAD-PCA / 3 d
+label <- "(a)"
+
+load("results/Aug 2018 SPE 3 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Aug 2018 T2 3 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 3 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, inset = c(-.075, -0.6), text.width = c(.35, .35, .35, .45, .5, .8), cex.norm = 1.5)
+
+dev.off()
+
+# SSAD-PCA / 5 d
+png("poster/membrane_failure_b.png", units = "in", width = 8, height = 3, res = 500)
+label <- "(b)"
+
+load("results/Aug 2018 SPE 5 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Aug 2018 T2 5 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 5 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, inset = c(-.075, -0.6), text.width = c(.35, .35, .35, .45, .5, .8), cex.norm = 1.5)
+dev.off()
+
+# SSAD-PCA / 7 d
+png("poster/membrane_failure_c.png", units = "in", width = 8, height = 3, res = 500)
+label <- "(c)"
+
+load("results/Aug 2018 SPE 7 day/ss.RData")
+data <- ss
+colnames(data)[ncol(data)] <- "SPE Alarm"
+
+load("results/Aug 2018 T2 7 day/ss.RData")
+data <- cbind(data, ss[,"Alarm"])
+colnames(data)[ncol(data)] <- "T2 Alarm"
+
+rm(ss)
+
+plotFaults(data = data, plotTime = plotTime, vars2plot = vars2plot, title = "SSAD-PCA / 7 d", trueFaultTime = trueFaultTime, trueAlarmTime = trueAlarmTime, label = label, inset = c(-.075, -0.6), text.width = c(.35, .35, .35, .45, .5, .8), cex.norm = 1.5)
+
+dev.off()
+```
+
+
+
+## Alarm rate calculator
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+# False-detection rate (FDR)
+# alarms are signaled when they should not be signaled
+# Alarmed IC / IC obs
+alarm.rate.calc <- function (data, real.alarms) {
+  alarmed.t2.obs <- which(data[,ncol(data)] == 1)
+  alarmed.t2.obs <- c(alarmed.t2.obs, which(data[,ncol(data)] == 3))
+  
+  nonalarmed.t2.obs <- which(data[,ncol(data)] == 0)
+  nonalarmed.t2.obs <- c(nonalarmed.t2.obs, which(data[,ncol(data)] == 2))
+  
+  alarmed.spe.obs <- which(data[,ncol(data)] == 2)
+  alarmed.spe.obs <- c(alarmed.spe.obs, which(data[,ncol(data)] == 3))
+  
+  nonalarmed.spe.obs <- which(data[,ncol(data)] == 0)
+  nonalarmed.spe.obs <- c(nonalarmed.spe.obs, which(data[,ncol(data)] == 1))
+  
+  
+  for(i in 1:length(real.alarms)){
+    oc.i <- which(index(data)  %within% real.alarms[[i]])
+    # oc.obs.n <- round(as.numeric(difftime(int_end(real.alarms[[i]]),int_start(real.alarms[[i]]), units ="mins")))
+    if (i == 1) {
+      oc.obs <- oc.i
+      # oc.total <- oc.obs.n
+    } else {
+      oc.obs <- c(oc.obs, oc.i)
+      # oc.total <- oc.total + oc.obs.n
+    }
+  }
+
+  ic.obs <- which(!index(data) %in% index(data)[oc.obs])
+  
+  alarmed.t2.ic.obs <- which(alarmed.t2.obs %in% ic.obs)
+  fdr.t2 <- length(alarmed.t2.ic.obs)/length(ic.obs)
+  
+  alarmed.spe.ic.obs <- which(alarmed.spe.obs %in% ic.obs)
+  fdr.spe <- length(alarmed.spe.ic.obs)/length(ic.obs)
+    
+  nonalarmed.t2.oc.obs <- which(nonalarmed.t2.obs %in% oc.obs)
+  ficr.t2 <- length(nonalarmed.t2.oc.obs)/length(oc.obs)
+  
+  nonalarmed.spe.oc.obs <- which(nonalarmed.spe.obs %in% oc.obs)
+  ficr.spe <- length(nonalarmed.spe.oc.obs)/length(oc.obs)
+  
+  return(c("FDR-T2" = fdr.t2, 
+           "FDR-SPE" = fdr.spe, 
+           "FICR-T2" = ficr.t2, 
+           "FICR-SPE" = ficr.spe))
+}
+
+
+# False IC rate (FICR)
+# Alarms are not signaled when they should be signaled
+# Non-alarmed OC obs / OC obs
+
+
+
+
+
+
+# alarm.calculator <- function(ss, real.alarms) {
+#   
+# alarms <- ss$Alarm
+# #rm(new.alarm)
+# for (i in 1:(nrow(alarms)-1)) {
+#   if (as.numeric(alarms[i]) != as.numeric(alarms[i+1])) {
+#     # if (as.numeric(alarms[i+1]) != 0) {
+#       if (!exists("new.alarm")) {
+#         new.alarm <- (i+1)
+#       } 
+#       if (exists("new.alarm")) {
+#         new.alarm <- c(new.alarm, (i+1))
+#       }
+#     # }
+#   }
+# }
+# new.alarm <- new.alarm[!duplicated(new.alarm)]
+# # index(ss)[new.alarm]
+# 
+# all.alarms <- alarms["2018-01-01/2018-01-31"]
+# type.alarms <- all.alarms[which(all.alarms$Alarm != 0)]
+# all.alarms <- index(all.alarms)[which(all.alarms$Alarm != 0)]
+# 
+# 
+# # sapply(real.alarms, function(x) { mapply(`%within%`, index(ss)[new.alarm], x) })
+# for(i in 1:length(real.alarms)){
+#   index <- which(all.alarms %within% real.alarms[[i]])
+#   if (i == 1) {
+#     all.index <- index
+#   } else {
+#     all.index <- c(all.index, index)
+#   }
+# }
+# print(length(all.index)/length(all.alarms))
+# 
+# t2.alarms <- type.alarms[c(which(type.alarms$Alarm == 1), which(type.alarms$Alarm == 3))]
+# for(i in 1:length(real.alarms)){
+#   index <- which(index(t2.alarms) %within% real.alarms[[i]])
+#   if (i == 1) {
+#     all.index <- index
+#   } else {
+#     all.index <- c(all.index, index)
+#   }
+# }
+# t2.alarms.true <- t2.alarms[all.index]
+# print(length(t2.alarms.true)/length(t2.alarms))
+# 
+# spe.alarms <- type.alarms[c(which(type.alarms$Alarm == 2), which(type.alarms$Alarm == 3))]
+# for(i in 1:length(real.alarms)){
+#   index <- which(index(spe.alarms) %within% real.alarms[[i]])
+#   if (i == 1) {
+#     all.index <- index
+#   } else {
+#     all.index <- c(all.index, index)
+#   }
+# }
+# spe.alarms.true <- spe.alarms[all.index]
+# print(length(spe.alarms.true)/length(spe.alarms))
+# }
+```
+
+## Alarm rates: January - SS
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+invisible(library(ADPCA))
+library(lubridate)
+
+real.alarms.mt <- c(interval(as.POSIXct("2018-01-05 09:14"),as.POSIXct("2018-01-05 10:56")), interval(as.POSIXct("2018-01-08 19:57:47"),as.POSIXct("2018-01-08 19:58:48")),  
+                 interval(as.POSIXct("2018-01-11 11:57:11"),as.POSIXct("2018-01-11 12:48:13"))) # Membrane shutdown
+real.alarms.mt <- c(real.alarms.mt, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms.br <- c(interval("2018-01-29 14:44:31","2018-01-30 13:58:19")) # Septic pump shutdown
+# What do consider the flow correction? 
+real.alarms.br <- c(real.alarms.br, interval("2018-01-18 10:11:57","2018-01-19 02:48:32")) # ???
+real.alarms.mt <- c(real.alarms.mt, interval("2018-01-25 08:03:03","2018-01-29 14:44:00")) # Flow correction
+real.alarms.ss <- c(real.alarms.mt, real.alarms.br)
+
+load("results/Jan 2018 5 day/ss.RData")
+alarm.stats <- data.frame(alarm.rate.calc(ss, real.alarms.ss))
+colnames(alarm.stats) <- "Jan 2018 5 day SS"
+
+load("results/Jan 2018 7 day/ss.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(ss, real.alarms.ss)))
+colnames(alarm.stats)[2] <- "Jan 2018 7 day SS"
+
+load("results/Jan 2018 10 day/ss.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(ss, real.alarms.ss)))
+colnames(alarm.stats)[3] <- "Jan 2018 10 day SS"
+
+load("results/Jan 2018 5 day/br.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(br, real.alarms.br)))
+colnames(alarm.stats)[4] <- "Jan 2018 5 day BR"
+
+load("results/Jan 2018 7 day/br.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(br, real.alarms.br)))
+colnames(alarm.stats)[5] <- "Jan 2018 7 day BR"
+
+load("results/Jan 2018 10 day/br.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(br, real.alarms.br)))
+colnames(alarm.stats)[6] <- "Jan 2018 10 day BR"
+
+load("results/Jan 2018 5 day/mt.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(mt, real.alarms.mt)))
+colnames(alarm.stats)[7] <- "Jan 2018 5 day MT"
+
+load("results/Jan 2018 7 day/mt.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(mt, real.alarms.mt)))
+colnames(alarm.stats)[8] <- "Jan 2018 7 day MT"
+
+load("results/Jan 2018 10 day/mt.RData")
+alarm.stats <- cbind(alarm.stats, data.frame(alarm.rate.calc(mt, real.alarms.mt)))
+colnames(alarm.stats)[9] <- "Jan 2018 10 day MT"
+
+write.csv(alarm.stats, "alarm_stats.csv")
+```
+
