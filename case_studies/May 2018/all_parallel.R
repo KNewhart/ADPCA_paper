@@ -77,87 +77,9 @@ real.faults <- interval(as.POSIXct("2018-05-16 17:00", tz="MST"), as.POSIXct("20
 real.faults <- c(real.faults,
                  interval(as.POSIXct("2018-06-01 11:38", tz="MST"), as.POSIXct("2018-06-01 12:46", tz="MST"))) # Bio 1 TSS
 
-
-### Function: Loop through each approach ###
-library(mvMonitoringv2)
-library(ADPCA)
-# Compile data
-rawData <- loadandcleanDBF(dataLocation, dayOne+daysToTest, daysToTest)
-rawData <- xts(rawData[,-1], order.by = rawData[,1])
-rawData <- rawData[paste("/",dayOne+daysToTest,sep="")]
-train.and.test.data <- rawData
-# graph_rawData(rawData)
-# graph_rawData(rawData[paste0(dayOne,"/",dayOne+7)],"training")
-# graph_rawData(rawData["2018-05-18"], "faults")
-# graph_rawData(rawData, "training_and_testing", fault.interval = real.faults)
-
-
-train.and.test.data <- uniquenessCheck(train.and.test.data, N=7)
-# Plot data
-# for(i in 1:length(real.faults)){
-#   graph_rawData(data=train.and.test.data[paste(as.Date(real.faults[i]@start))], fault.interval=real.faults[i],keyword=paste0("fault",i))
-# }
-
-# Define methods
-method.parameters <- list()
-method.parameters[[length(method.parameters)+1]] <- list(method="SS PCA", 
-                                                         dataCols=seq(1,ncol(train.and.test.data)),
-                                                         updateFreq = 1e10,
-                                                         Dynamic=FALSE
-)
-method.parameters[[length(method.parameters)+1]] <-
-  list(method="BR SS PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsBR),
-       updateFreq = 1e10,
-       Dynamic=FALSE
-  )
-method.parameters[[length(method.parameters)+1]] <- 
-  list(method="MT SS PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsMT),
-       updateFreq = 1e10,
-       Dynamic=FALSE
-  )
-method.parameters[[length(method.parameters)+1]] <- list(method="SS D-PCA", 
-                                                         dataCols=seq(1,ncol(train.and.test.data)),
-                                                         updateFreq = 1e10,
-                                                         Dynamic=TRUE
-)
-method.parameters[[length(method.parameters)+1]] <-
-  list(method="BR SS D-PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsBR),
-       updateFreq = 1e10,
-       Dynamic=TRUE
-  )
-method.parameters[[length(method.parameters)+1]] <- 
-  list(method="MT SS D-PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsMT),
-       updateFreq = 1e10,
-       Dynamic=TRUE
-  )
-method.parameters[[length(method.parameters)+1]] <- list(method="SS AD-PCA", 
-                                                         dataCols=seq(1,ncol(train.and.test.data)),
-                                                         updateFreq = 1440,
-                                                         Dynamic=TRUE
-)
-method.parameters[[length(method.parameters)+1]] <-
-  list(method="BR SS AD-PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsBR),
-       updateFreq = 1440,
-       Dynamic=TRUE
-  )
-method.parameters[[length(method.parameters)+1]] <- 
-  list(method="MT SS AD-PCA",
-       dataCols=which(colnames(train.and.test.data) %in% varsMT),
-       updateFreq = 1440,
-       Dynamic=TRUE
-  )
-
-
-
-# Train and test each rolling window
-compiled.results.all <- array(data=NA, c(6,length(method.parameters),length(rollingWindowDays)))
-colnames.compiled.results.all <- list()
 # Calculate fault detection accuracy
+length(which(index(data) %within% real.faults[[1]]))+length(which(index(data) %within% real.faults[[2]]))+length(which(index(data) %within% real.faults[[3]]))
+
 alarm.rate.calc <- function (FaultChecks, real.alarms) {
   alarmed.t2.obs <- which(FaultChecks$Alarm == 1)
   alarmed.t2.obs <- c(alarmed.t2.obs, which(FaultChecks$Alarm == 3))
@@ -224,6 +146,80 @@ alarm.rate.calc <- function (FaultChecks, real.alarms) {
 }
 
 
+### Function: Loop through each approach ###
+library(mvMonitoringv2)
+library(ADPCA)
+# Compile data
+rawData <- loadandcleanDBF(dataLocation, dayOne+daysToTest, daysToTest)
+rawData <- xts(rawData[,-1], order.by = rawData[,1])
+rawData <- rawData[paste("/",dayOne+daysToTest,sep="")]
+train.and.test.data <- rawData
+
+train.and.test.data <- uniquenessCheck(train.and.test.data, N=7)
+graph_rawData(train.and.test.data,"training")
+# Plot data
+for(i in 1:length(real.faults)){
+  graph_rawData(data=train.and.test.data[paste(as.Date(real.faults[i]@start))], fault.interval=real.faults[i],keyword=paste0("fault",i))
+}
+
+
+
+##### SINGLE STATE #####
+# Define methods
+method.parameters <- list()
+method.parameters[[length(method.parameters)+1]] <- list(method="SS PCA", 
+                                                         dataCols=seq(1,ncol(train.and.test.data)),
+                                                         updateFreq = 1e10,
+                                                         Dynamic=FALSE
+)
+method.parameters[[length(method.parameters)+1]] <-
+  list(method="BR SS PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsBR),
+       updateFreq = 1e10,
+       Dynamic=FALSE
+  )
+method.parameters[[length(method.parameters)+1]] <- 
+  list(method="MT SS PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsMT),
+       updateFreq = 1e10,
+       Dynamic=FALSE
+  )
+method.parameters[[length(method.parameters)+1]] <- list(method="SS D-PCA", 
+                                                         dataCols=seq(1,ncol(train.and.test.data)),
+                                                         updateFreq = 1e10,
+                                                         Dynamic=TRUE
+)
+method.parameters[[length(method.parameters)+1]] <-
+  list(method="BR SS D-PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsBR),
+       updateFreq = 1e10,
+       Dynamic=TRUE
+  )
+method.parameters[[length(method.parameters)+1]] <- 
+  list(method="MT SS D-PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsMT),
+       updateFreq = 1e10,
+       Dynamic=TRUE
+  )
+method.parameters[[length(method.parameters)+1]] <- list(method="SS AD-PCA", 
+                                                         dataCols=seq(1,ncol(train.and.test.data)),
+                                                         updateFreq = 1440,
+                                                         Dynamic=TRUE
+)
+method.parameters[[length(method.parameters)+1]] <-
+  list(method="BR SS AD-PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsBR),
+       updateFreq = 1440,
+       Dynamic=TRUE
+  )
+method.parameters[[length(method.parameters)+1]] <- 
+  list(method="MT SS AD-PCA",
+       dataCols=which(colnames(train.and.test.data) %in% varsMT),
+       updateFreq = 1440,
+       Dynamic=TRUE
+  )
+
+
 library(doParallel)
 library(foreach)
 numCores <- detectCores()
@@ -235,114 +231,104 @@ foreach.results <- foreach(training.days=rollingWindowDays,
                            .packages = c("mvMonitoringv2",
                                          "ADPCA")) %dopar% {
                                            
-  results.all <- list() # Store results of each training window
-  
-  for(r.method in 1:length(method.parameters)) { # for each method configuration
-    # Test SPE and T2
-    testing.stat <- "SPE"
-    lets.try.something <- c(ncol(train.and.test.data))
-    error.index <- "EIGEN ERROR"
-    while(error.index == "EIGEN ERROR") {
-      try(expr = {
-        train1A_ls <- mvMonitoringv2::mspTrain(
-          data = train.and.test.data[,-lets.try.something],
-          trainObs = nrow(train.and.test.data[paste0("/",dayOne+training.days)]),
-          labelVector = rep(1, nrow(train.and.test.data)), 
-          updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
-          Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
-          faultsToTriggerAlarm = 3,
-          statistic=testing.stat
-        )
-        error.index <- "FINISHED"
-      }, silent=FALSE)
-      if(error.index == "EIGEN ERROR") {
-        remove.index <- min(apply(train.and.test.data[,-lets.try.something],2,function(x) length(unique(x))));
-        lets.try.something <- c(lets.try.something, which(apply(train.and.test.data,2,function(x) length(unique(x))) <= remove.index))
-      }
-    }
-    alarm.rate.results <- as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults))
-    alarm.results <- as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))])
+                                           results.all <- list() # Store results of each training window
+                                           
+                                           for(r.method in 1:length(method.parameters)) { # for each method configuration
+                                             # Test SPE and T2
+                                             testing.stat <- "SPE"
+                                             data <- train.and.test.data[,as.numeric(unlist(method.parameters[[r.method]][2]))]
+                                             data <- cbind(data, rep(1, nrow(data)))
+                                             lets.try.something <- c(ncol(data))
+                                             error.index <- "EIGEN ERROR"
+                                             while(error.index == "EIGEN ERROR") {
+                                               try(expr = {
+                                                 train1A_ls <- mvMonitoringv2::mspTrain(
+                                                   data = data[,-lets.try.something],
+                                                   trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
+                                                   labelVector = rep(1, nrow(data)), 
+                                                   updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+                                                   Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+                                                   faultsToTriggerAlarm = 3,
+                                                   statistic=testing.stat
+                                                 )
+                                                 error.index <- "FINISHED"
+                                               }, silent=FALSE)
+                                               if(error.index == "EIGEN ERROR") {
+                                                 remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+                                                 lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+                                               }
+                                             }
+                                             alarm.rate.results <- as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults))
+                                             alarm.results <- as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))])
+                                             
+                                             testing.stat <- "T2"
+                                             lets.try.something <- c(ncol(data))
+                                             error.index <- "EIGEN ERROR"
+                                             while(error.index == "EIGEN ERROR") {
+                                               try(expr = {
+                                                 train1A_ls <- mvMonitoringv2::mspTrain(
+                                                   data = data[,-lets.try.something],
+                                                   trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
+                                                   labelVector = rep(1, nrow(data)), 
+                                                   updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+                                                   Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+                                                   faultsToTriggerAlarm = 3,
+                                                   statistic=testing.stat
+                                                 )
+                                                 error.index <- "FINISHED"
+                                               }, silent=FALSE)
+                                               if(error.index == "EIGEN ERROR") {
+                                                 remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+                                                 lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+                                               }
+                                             }
+                                             
+                                             alarm.rate.results <- cbind(alarm.rate.results, as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults)))
+                                             colnames(alarm.rate.results) <- c("SPE", "T2")
+                                             alarm.results <- cbind(alarm.results, as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))]))
+                                             
+                                             results.all[[length(results.all)+1]] <- list(alarm.results, alarm.rate.results)
+                                             names(results.all[[length(results.all)]]) <- c("Test Results", "Alarm Statistics")
+                                             names(results.all[[length(results.all)]][[2]])[1:2] <- c("SPE", "T2")
+                                             names(results.all)[r.method] <- paste(as.character(unlist(method.parameters[[r.method]][1])))
+                                           }
+                                           
+                                           return(list(results.all))
+                                         }
+names(foreach.results) <- paste(as.character(rollingWindowDays),"days")
+
+
+
+save(foreach.results, file="foreach_results.RData")
+load(file="foreach_results.RData")
+library(xlsx)
+if(exists("alarm.stats")) rm(alarm.stats)
+for(x in 1:length(foreach.results)) { # For each day
+  for(y in 1:length(foreach.results[[x]])) { # For each method
     
-    testing.stat <- "T2"
-    lets.try.something <- c(ncol(train.and.test.data))
-    error.index <- "EIGEN ERROR"
-    while(error.index == "EIGEN ERROR") {
-      try(expr = {
-        train1A_ls <- mvMonitoringv2::mspTrain(
-          data = train.and.test.data[,-lets.try.something],
-          trainObs = nrow(train.and.test.data[paste0("/",dayOne+training.days)]),
-          labelVector = rep(1, nrow(train.and.test.data)), 
-          updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
-          Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
-          faultsToTriggerAlarm = 3,
-          statistic=testing.stat
-        )
-        error.index <- "FINISHED"
-      }, silent=FALSE)
-      if(error.index == "EIGEN ERROR") {
-        remove.index <- min(apply(train.and.test.data[,-lets.try.something],2,function(x) length(unique(x))));
-        lets.try.something <- c(lets.try.something, which(apply(train.and.test.data,2,function(x) length(unique(x))) <= remove.index))
-      }
-    }
+    pull.data <- foreach.results[[x]][[y]][[2]]
+    pull.data[c(1:3), 1] <- pull.data[c(1:3), 2]
     
-    alarm.rate.results <- cbind(alarm.rate.results, as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults)))
-    colnames(alarm.rate.results) <- c("SPE", "T2")
-    alarm.results <- cbind(alarm.results, as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))]))
-        
-    results.all[[length(results.all)+1]] <- list(alarm.results, alarm.rate.results)
-    names(results.all[[length(results.all)]]) <- c("Test Results", "Alarm Statistics")
-    names(results.all[[length(results.all)]][[2]])[1:2] <- c("SPE", "T2")
-    names(results.all)[r.method] <- paste(as.character(unlist(method.parameters[[r.method]][1])))
-  }
-
-  return(list(results.all))
-}
-names(foreach.results) <- as.character(rollingWindowDays)
-
-
-# Go back to SPE/T2
-training.days <- rollingWindowDays[1]
-r.method <- 1
-lets.try.something <- c(ncol(train.and.test.data))
-error.index <- "EIGEN ERROR"
-while(error.index == "EIGEN ERROR") {
-  try(expr = {
-    train1A_ls <- mvMonitoring::mspTrain(
-      data = train.and.test.data[,-lets.try.something],
-      trainObs = nrow(train.and.test.data[paste0("/",dayOne+training.days)]),
-      labelVector = rep(1, nrow(train.and.test.data)), 
-      updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
-      Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
-      faultsToTriggerAlarm = 3
-    )
-    error.index <- "FINISHED"
-  }, silent=FALSE)
-  if(error.index == "EIGEN ERROR") {
-    remove.index <- min(apply(train.and.test.data[,-lets.try.something],2,function(x) length(unique(x))));
-    lets.try.something <- c(lets.try.something, which(apply(train.and.test.data,2,function(x) length(unique(x))) <= remove.index))
+    if(!exists("alarm.stats")) {
+      alarm.stats <- as.data.frame(pull.data[,1], row.names = rownames(pull.data))
+      colnames(alarm.stats) <- paste(names(foreach.results[[x]])[y], names(foreach.results)[x])
+    } else {
+      alarm.stats <- cbind(alarm.stats, alarm.stats <- as.data.frame(pull.data[,1], row.names = rownames(pull.data)))
+      colnames(alarm.stats)[ncol(alarm.stats)] <- paste(names(foreach.results[[x]])[y], names(foreach.results)[x])
+    }
   }
 }
-alarm.results <- as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults))
-faultCheckCompiler[[length(faultCheckCompiler)+1]] <- train1A_ls$FaultChecks
-names(faultCheckCompiler)[[length(faultCheckCompiler)]] <- make.names(paste(as.character(unlist(method.parameters[[r.method]][1]))))
+write.xlsx(alarm.stats, file="SS_results_all.xlsx")
 
-
-# 
-# # Save results
-# library(xlsx)
-# for(i in 1:length(rollingWindowDays)) {
-# 
-#     new.data <- as.data.frame(compiled.results.all[,,i])
-#     colnames(new.data) <- colnames.compiled.results.all[[i]]
-#     rownames(new.data) <- rownames(alarm.results)
-#     save.data <- as.data.frame(cbind(rep(rollingWindowDays[i],6), new.data))
-#     if(i == 1) write.xlsx(save.data, file="SS_results.xlsx", sheetName=paste(rollingWindowDays[i],"days"), TRUE)
-#     if(i > 1) write.xlsx(save.data, file="SS_results.xlsx", append=TRUE, sheetName=paste(rollingWindowDays[i],"days"), row.names=TRUE)
-# }
+for(x in 1:length(foreach.results)) { # For each day
+  for(y in 1:length(foreach.results[[x]])) { # For each method
+    pull.data <- foreach.results[[x]][[y]][[1]]
+    write.xlsx(pull.data, file="SS_results_all.xlsx", sheetName=paste(names(foreach.results[[x]])[y], names(foreach.results)[x]), append=TRUE, row.names=TRUE)
+  }}
 
 
 
-### ADD MULTISTATE ###
+##### MULTISTATE #####
 train.and.test.data.2 <- rawData
 method.parameters <- list()
 method.parameters[[length(method.parameters)+1]] <- list(method="MS BR PCA", 
@@ -424,132 +410,135 @@ stateGenerator <- function(data,
   
 }
 
-# train.and.test.data.2 <- uniquenessCheck(train.and.test.data.2, N=7)
-compiled.results.all <- array(data=NA, c(6,length(method.parameters),length(rollingWindowDays)))
-colnames.compiled.results.all <- list()
 
 # Train and test each rolling window
-for(training.days in rollingWindowDays) {
-  
-  print(paste("Starting", training.days, "day rolling window"))
-  
-  train.and.test.data.br <- stateGenerator(data = train.and.test.data.2,
-                                           stateVars = stateVarsBR, 
-                                           vars=varsBR,
-                                           rollingWindowDays = training.days)
-  
-  train.and.test.data.mt <- stateGenerator(data = train.and.test.data.2,
-                                           stateVars = stateVarsMT, 
-                                           vars=varsMT,
-                                           rollingWindowDays = training.days)
-  results.all.sum <- vector()
-  for(r.method in 1:length(method.parameters)) {
-    
-    if(length(grep("BR", method.parameters[[r.method]][1]))==1) {
-      train.and.test.data.loop <- train.and.test.data.br
-    } else {
-      train.and.test.data.loop <- train.and.test.data.mt
-    }
-    results.all <- vector()
-    for(i in 1:length(train.and.test.data.loop)) {
-      
-      
-      
-      testing.stat <- "SPE"
-      lets.try.something <- c(ncol(train.and.test.data.loop[[i]]))
-      error.index <- "EIGEN ERROR"
-      while(error.index == "EIGEN ERROR") {
-        try(expr = {
-          train1A_ls <- mvMonitoringv2::mspTrain(
-            data = train.and.test.data.loop[[i]][,-lets.try.something],
-            trainObs = nrow(train.and.test.data.loop[[i]][paste0("/",dayOne+training.days)]),
-            labelVector = rep(1, nrow(train.and.test.data.loop[[i]])), 
-            updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
-            Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
-            faultsToTriggerAlarm = 3,
-            statistic=testing.stat
-          )
-          error.index <- "FINISHED"
-        }, silent=FALSE)
-        if(error.index == "EIGEN ERROR") {
-          remove.index <- min(apply(train.and.test.data.loop[[i]][,-lets.try.something],2,function(x) length(unique(x))));
-          lets.try.something <- c(lets.try.something, which(apply(train.and.test.data.loop[[i]],2,function(x) length(unique(x))) <= remove.index))
-        }
-      }
-      alarm.results <- as.data.frame(alarm.rate.calc(FaultChecks=train1A_ls$FaultChecks, real.alarms=real.faults))
-      faultCheckCompiler[[length(faultCheckCompiler)+1]] <- train1A_ls$FaultChecks
-      names(faultCheckCompiler)[[length(faultCheckCompiler)]] <- make.names(paste(as.character(unlist(method.parameters[[r.method]][1])), testing.stat))
-      
-      print(paste(as.character(unlist(method.parameters[[r.method]][1])), testing.stat,"completed"))
-      
-      testing.stat <- "T2"
-      lets.try.something <- c(ncol(train.and.test.data.loop[[i]]))
-      error.index <- "EIGEN ERROR"
-      while(error.index == "EIGEN ERROR") {
-        try(expr = {
-          train1A_ls <- mvMonitoringv2::mspTrain(
-            data = train.and.test.data.loop[[i]][,-lets.try.something],
-            trainObs = nrow(train.and.test.data.loop[[i]][paste0("/",dayOne+training.days)]),
-            labelVector = rep(1, nrow(train.and.test.data.loop[[i]])), 
-            updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
-            Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
-            faultsToTriggerAlarm = 3,
-            statistic=testing.stat
-          )
-          error.index <- "FINISHED"
-        }, silent=FALSE)
-        if(error.index == "EIGEN ERROR") {
-          remove.index <- min(apply(train.and.test.data.loop[[i]][,-lets.try.something],2,function(x) length(unique(x))));
-          lets.try.something <- c(lets.try.something, which(apply(train.and.test.data.loop[[i]],2,function(x) length(unique(x))) <= remove.index))
-        }
-      }
-      
-      alarm.results <- cbind(alarm.results, as.data.frame(alarm.rate.calc(train1A_ls$FaultChecks, real.faults)))
-      alarm.results[c(1:3),1] <- alarm.results[c(1:3),2]
-      alarm.results <-alarm.results[,1]
-      results.all <- cbind(results.all, alarm.results)
-      
-      faultCheckCompiler[[length(faultCheckCompiler)+1]] <- train1A_ls$FaultChecks
-      names(faultCheckCompiler)[[length(faultCheckCompiler)]] <- make.names(paste(as.character(unlist(method.parameters[[r.method]][1])), testing.stat))
-      
-    }
-    # colnames(results.all)[r.method] <- as.character(unlist(method.parameters[[r.method]][1]))
-    print(paste(as.character(unlist(method.parameters[[r.method]][1])), testing.stat,"completed"))
-    
-    n.testing.obs <- unlist(lapply(train.and.test.data.loop, function(x) nrow(x[paste0("/",dayOne+training.days)])))
-    summary.results <- matrix(NA, nrow=nrow(results.all), ncol=length(n.testing.obs))
-    # Multiply each experimental result by the population frequency to weigh the results of each experiment
-    for(j in 1:length(n.testing.obs)) {
-      summary.results[,j] <- results.all[,j]*n.testing.obs[j]/sum(n.testing.obs)
-    }
-    alarm.results.sum <- apply(summary.results,1,sum)
-    results.all.sum <- cbind(results.all.sum, alarm.results.sum)
-    colnames(results.all.sum)[ncol(results.all.sum)] <- as.character(unlist(method.parameters[[r.method]][1]))
-  }
-  
-  compiled.results.all[,,which(training.days == rollingWindowDays)] <- results.all.sum
-  # colnames.compiled.results.all[[which(training.days == rollingWindowDays)]] <- colnames(results.all)
+# for(training.days in rollingWindowDays) {
+library(doParallel)
+library(foreach)
+numCores <- detectCores()
+registerDoParallel(numCores)
+foreach.results <- foreach(training.days=rollingWindowDays,
+                           .combine = 'c',
+                           # .multicombine=TRUE,
+                           # .init=list(list(), list()),
+                           .packages = c("mvMonitoringv2",
+                                         "ADPCA")) %dopar% {
+                                           
+                                           train.and.test.data.br <- stateGenerator(data = train.and.test.data.2,
+                                                                                    stateVars = stateVarsBR, 
+                                                                                    vars=varsBR,
+                                                                                    rollingWindowDays = training.days)
+                                           
+                                           train.and.test.data.mt <- stateGenerator(data = train.and.test.data.2,
+                                                                                    stateVars = stateVarsMT, 
+                                                                                    vars=varsMT,
+                                                                                    rollingWindowDays = training.days)
+                                           
+                                           for(r.method in 1:length(method.parameters)) {
+                                             
+                                             if(length(grep("BR", method.parameters[[r.method]][1]))==1) {
+                                               train.and.test.data.loop <- train.and.test.data.br
+                                             } else {
+                                               train.and.test.data.loop <- train.and.test.data.mt
+                                             }
+                                             results.all <- vector()
+                                             
+                                             for(i in 1:length(train.and.test.data.loop)) { # For each state
+                                               
+                                               testing.stat <- "SPE"
+                                               data <- train.and.test.data.loop[[i]]
+                                               lets.try.something <- c(ncol(train.and.test.data.loop[[i]]))
+                                               error.index <- "EIGEN ERROR"
+                                               while(error.index == "EIGEN ERROR") {
+                                                 try(expr = {
+                                                   train1A_ls <- mspTrain(
+                                                     data = data[,-lets.try.something],
+                                                     trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
+                                                     labelVector = rep(1, nrow(data)), 
+                                                     updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+                                                     Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+                                                     faultsToTriggerAlarm = 3,
+                                                     statistic=testing.stat
+                                                   )
+                                                   error.index <- "FINISHED"
+                                                 }, silent=FALSE)
+                                                 if(error.index == "EIGEN ERROR") {
+                                                   remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+                                                   lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+                                                 }
+                                               }
+                                               alarm.results <- as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))])
+                                               
+                                               testing.stat <- "T2"
+                                               lets.try.something <- c(ncol(train.and.test.data.loop[[i]]))
+                                               error.index <- "EIGEN ERROR"
+                                               while(error.index == "EIGEN ERROR") {
+                                                 try(expr = {
+                                                   train1A_ls <- mspTrain(
+                                                     data = data[,-lets.try.something],
+                                                     trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
+                                                     labelVector = rep(1, nrow(data)), 
+                                                     updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+                                                     Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+                                                     faultsToTriggerAlarm = 3,
+                                                     statistic=testing.stat
+                                                   )
+                                                   error.index <- "FINISHED"
+                                                 }, silent=FALSE)
+                                                 if(error.index == "EIGEN ERROR") {
+                                                   remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+                                                   lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+                                                 }
+                                               }
+                                               alarm.results <- cbind(alarm.results, as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))]))
+                                               if(i == 1) alarm.results.state <- alarm.results
+                                               if(i > 1) alarm.results.state <- rbind(alarm.results.state, alarm.results)
+                                             }
+                                             
+                                             if(r.method==1) alarm.results.method <- list(alarm.results.state)
+                                             if(r.method>1) alarm.results.method <- c(alarm.results.method, list(alarm.results.state))
+                                             names(alarm.results.method)[[length(alarm.results.method)]] <- paste(as.character(unlist(method.parameters[[r.method]][1])))
+                                           }
+                                           results <- list(alarm.results.method)
+                                           names(results) <- paste(training.days,"days")
+                                           return(results)
+                                         }
+
+
+alarm.results <- foreach(i=1:length(foreach.results),
+                         .combine = 'c') %dopar% { # For each day
+                           
+                           for(j in 1:length(foreach.results[[i]])) { # For each method
+                             foreach.results[[i]][[j]] <- cbind(foreach.results[[i]][[j]], rep(NA, nrow(foreach.results[[i]][[j]])))
+                             colnames(foreach.results[[i]][[j]])[ncol(foreach.results[[i]][[j]])] <-"Alarm"
+                             for(k in 1:nrow(foreach.results[[i]][[j]])) {
+                               if((foreach.results[[i]][[j]][k,2] == 0) && (foreach.results[[i]][[j]][k,4] == 0)) foreach.results[[i]][[j]][k,5] <- 0
+                               if((foreach.results[[i]][[j]][k,2] == 0) && (foreach.results[[i]][[j]][k,4] == 1)) foreach.results[[i]][[j]][k,5] <- 1
+                               if((foreach.results[[i]][[j]][k,2] == 1) && (foreach.results[[i]][[j]][k,4] == 0)) foreach.results[[i]][[j]][k,5] <- 2
+                               if((foreach.results[[i]][[j]][k,2] == 1) && (foreach.results[[i]][[j]][k,4] == 1)) foreach.results[[i]][[j]][k,5] <- 3
+                             }
+                             results <- as.data.frame(alarm.rate.calc(FaultChecks = xts(foreach.results[[i]][[j]], order.by = as.POSIXct(rownames(foreach.results[[i]][[j]]))), real.alarms = real.faults))
+                             colnames(results) <- paste(names(foreach.results[[i]])[j])
+                             
+                             if(j==1) results.all <- results
+                             if(j > 1) results.all <- cbind(results.all, results)
+                           }
+                           results.list <- list(results.all)
+                           names(results.list) <- paste(names(foreach.results)[i])
+                           return(results.list)
+                         }
+
+
+for(x in 1:length(alarm.results)) { # For each day
+  pull.data <- as.data.frame(alarm.results[[x]])
+  colnames(pull.data) <- paste(colnames(pull.data), names(alarm.results)[x])
+  if(x==1) results.cbind <- pull.data
+  if(x>1) results.cbind <- cbind(results.cbind, pull.data)
 }
+write.xlsx(results.cbind, file="MS_results_all.xlsx")
 
-
-ms_results <- compiled.results.all
-ms_cols <- colnames.compiled.results.all
-
-# Save results
-library(xlsx)
-for(i in 1:length(rollingWindowDays)) {
-  
-  new.data <- as.data.frame(ss_results[,,i])
-  colnames(new.data) <- ss_cols[[i]]
-  rownames(new.data) <- rownames(alarm.results)
-  new.data <- cbind(new.data, as.data.frame(ms_results[,,i]))
-  # colnames(new.data)[(ncol(new.data)-1):ncol(new.data)] <- ms_cols[[i]]
-  save.data <- as.data.frame(cbind(rep(rollingWindowDays[i],6), new.data))
-  if(i == 1) write.xlsx(save.data, file="MS_SS_results.xlsx", sheetName=paste(rollingWindowDays[i],"days"), TRUE)
-  if(i > 1) write.xlsx(save.data, file="MS_SS_results.xlsx", append=TRUE, sheetName=paste(rollingWindowDays[i],"days"), row.names=TRUE)
-}
-
-
-
-
-
+for(x in 1:length(foreach.results)) { # For each day
+  for(y in 1:length(foreach.results[[x]])) { # For each method
+    pull.data <- foreach.results[[x]][[y]]
+    write.xlsx(pull.data, file="MS_results_all.xlsx", sheetName=paste(names(foreach.results[[x]])[y], names(foreach.results)[x]), append=TRUE, row.names=TRUE)
+  }}
