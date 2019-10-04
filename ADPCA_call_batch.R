@@ -1,8 +1,15 @@
-library(mvMonitoringv2)
 library(ADPCA)
+
 ### Preliminaries ###
-setwd("C:\\Users\\R-Compiler\\Documents\\KNewhart\\ADPCA_paper")
-dataLocation <- "C:\\Users\\R-Compiler\\Documents\\KNewhart\\MP_SBMBR_data\\"
+# Set working directory
+loc <- "Laptop" 
+{
+  if(loc=="R-Compiler") setwd("C:\\Users\\R-Compiler\\Documents\\KNewhart\\ADPCA_paper")
+  if(loc=="Laptop") setwd(file.path(Sys.getenv("USERPROFILE"),"Dropbox\\Newhart ADPCA Paper\\R"))
+  if(loc=="R-Compiler")  dataLocation <- "C:\\Users\\R-Compiler\\Documents\\KNewhart\\MP_SBMBR_data\\"
+  if(loc=="Laptop") dataLocation <- file.path(Sys.getenv("USERPROFILE"),"Dropbox\\Data\\MP_SBMBR_data\\")
+}
+# Set process & state variables
 {
   stateVarsBR <- c("BIO_1\\CURRENT_PHASE",
                    "BIO_2\\CURRENT_PHASE",
@@ -66,7 +73,7 @@ dataLocation <- "C:\\Users\\R-Compiler\\Documents\\KNewhart\\MP_SBMBR_data\\"
               "MBR_2\\LEVEL\\PROCESS_VALUE",
               "PERMEATE_TANK\\TURBIDITY\\PROCESS_VALUE")
 }
-
+# Set case study parameters
 setwd("case_studies/sewage_pump_shutdown")
 dayN <- as.Date("2018-01-29")
 roll <- c(3,5,7)
@@ -74,9 +81,10 @@ rollingWindowDays <- roll
 dayOne <- dayN - 2*rollingWindowDays
 daysToTest <- -as.numeric(difftime(dayOne, dayN)) + 1
 
+### For each set of rolling window days
 foreach.results <- list()
   for(i in 1:length(rollingWindowDays)) {
-  # Compile data
+  # Compile raw data
   rawData <- loadandcleanDBF(dataLocation, dayOne[i]+daysToTest[i], daysToTest[i])
   rawData <- xts(rawData[,-1], order.by = rawData[,1])
   rawData <- rawData[paste("/",dayOne[i]+daysToTest[i],sep="")]
@@ -194,8 +202,33 @@ foreach.results <- list()
         }
       }
       
-      results.all[[length(results.all)+1]] <- list(alarm.results,
-                                                   as.data.frame(merge(train1A_ls$Non_Alarmed_Obs, train1A_ls$FaultChecks)))
+      alarm.results <- list(alarm.results, as.data.frame(merge(train1A_ls$Non_Alarmed_Obs, train1A_ls$FaultChecks)))
+      
+      testing.stat <- "SPE_T2"
+      lets.try.something <- c(ncol(data))
+      error.index <- "EIGEN ERROR"
+      while(error.index == "EIGEN ERROR") {
+        try(expr = {
+          train1A_ls <- mvMonitoring::mspTrain(
+            data = data[,-lets.try.something],
+            trainObs = nrow(data[paste0("/",dayOne[i]+rollingWindowDays[i]-1)]),
+            labelVector = rep(1, nrow(data)), 
+            updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+            Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+            faultsToTriggerAlarm = 3
+          )
+          error.index <- "FINISHED"
+        }, silent=FALSE)
+        if(error.index == "EIGEN ERROR") {
+          remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+          lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+        }
+      }
+      
+      results.all[[length(results.all)+1]] <- c(alarm.results,
+                                                list(as.data.frame(merge(train1A_ls$Non_Alarmed_Obs, train1A_ls$FaultChecks))))
+      
+      
     }
     foreach.results <- c(foreach.results, list(results.all))
 }
@@ -428,7 +461,8 @@ stateGenerator <- function(data,
                              .combine = 'c',
                              # .multicombine=TRUE,
                              # .init=list(list(), list()),
-                             .packages = c("mvMonitoringv2",
+                             .packages = c("mvMonitoring",
+                                           "mvMonitoringv2",
                                            "ADPCA")) %dopar% {
   
   train.and.test.data.br <- stateGenerator(data = train.and.test.data.2,
@@ -460,7 +494,7 @@ stateGenerator <- function(data,
       error.index <- "EIGEN ERROR"
       while(error.index == "EIGEN ERROR") {
         try(expr = {
-          train1A_ls <- mspTrain(
+          train1A_ls <- mvMonitoringv2::mspTrain(
             data = data[,-lets.try.something],
             trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
             labelVector = rep(1, nrow(data)), 
@@ -483,7 +517,7 @@ stateGenerator <- function(data,
       error.index <- "EIGEN ERROR"
       while(error.index == "EIGEN ERROR") {
         try(expr = {
-          train1A_ls <- mspTrain(
+          train1A_ls <- mvMonitoringv2::mspTrain(
             data = data[,-lets.try.something],
             trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
             labelVector = rep(1, nrow(data)), 
@@ -500,6 +534,31 @@ stateGenerator <- function(data,
         }
       }
       alarm.results <- cbind(alarm.results, as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))]))
+      
+      
+      testing.stat <- "SPE_T2"
+      lets.try.something <- c(ncol(train.and.test.data.loop[[i]]))
+      error.index <- "EIGEN ERROR"
+      while(error.index == "EIGEN ERROR") {
+        try(expr = {
+          train1A_ls <- mvMonitoring::mspTrain(
+            data = data[,-lets.try.something],
+            trainObs = nrow(data[paste0("/",dayOne+training.days-1)]),
+            labelVector = rep(1, nrow(data)), 
+            updateFreq = as.numeric(unlist(method.parameters[[r.method]][3])),
+            Dynamic = as.logical(unlist(method.parameters[[r.method]][4])), 
+            faultsToTriggerAlarm = 3
+          )
+          error.index <- "FINISHED"
+        }, silent=FALSE)
+        if(error.index == "EIGEN ERROR") {
+          remove.index <- min(apply(data[,-lets.try.something],2,function(x) length(unique(x))));
+          lets.try.something <- c(lets.try.something, which(apply(data,2,function(x) length(unique(x))) <= remove.index))
+        }
+      }
+      alarm.results <- cbind(alarm.results, as.data.frame(train1A_ls$FaultChecks[,grep(testing.stat, colnames(train1A_ls$FaultChecks))]))
+      
+      
       if(i == 1) alarm.results.state <- alarm.results
       if(i > 1) alarm.results.state <- rbind(alarm.results.state, alarm.results)
     }
