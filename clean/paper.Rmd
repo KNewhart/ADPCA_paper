@@ -1,0 +1,41 @@
+---
+output:
+  bookdown::word_document2:
+    reference_docx: paper.dotx
+---
+# Results for Newhart, et al., 2019
+
+## Ideal
+
+### January
+
+### March
+
+### May
+
+
+
+
+## Non-ideal
+
+### Pump failure
+```{r message=FALSE, warning=FALSE}
+# Name of case study
+folder <- "pump_failure"
+
+# Day of event/day to end on
+dayN <- as.Date("2018-01-29")
+
+# Rolling window sizes to test
+rollingWindowDays <- c(3,5,7)
+
+# Run analysis
+source("src/nonideal_procedure.R")
+```
+
+
+### Change to influent quality
+
+### Influent overdose
+
+### Sensor faults
