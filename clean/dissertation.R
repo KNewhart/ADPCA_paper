@@ -33,7 +33,7 @@ for(t in 1:length(timeframes)) {
   dates.ch <- unique(substr(index(allData),1,10))
   
   
-  
+  metrics.days.ls <- list()
   results.days.ls <- list()
   # For each rolling window...
   for(days in rollingWindowDays) {
@@ -171,6 +171,8 @@ for(t in 1:length(timeframes)) {
                                                         per.var=per.var,
                                                         metric="SPE-T2")
     }
+    print(paste(Sys.time(),"Training Window",days,"Completed."))
+    
     # Combine results for all days tested
     results.days.ls[[length(results.days.ls)+1]] <- list("Persistence"=do.call("rbind", control.limit.ls), # Univariate static control limits
                                                          "SSPCA-BR-SPE"=do.call("rbind", lapply(sspca.spe.ls, function(x) x[[1]])), # SS PCA for BR
@@ -186,11 +188,25 @@ for(t in 1:length(timeframes)) {
                                                          "MSADPCA-BR-SPE-T2"=do.call("rbind", lapply(mspca.both.ls, function(x) x[[1]])), # MS AD-PCA for BR
                                                          "MSADPCA-MT-SPE-T2"=do.call("rbind", lapply(mspca.both.ls, function(x) x[[2]])) # MS AD-PCA for MT
     )
+    metrics.days.ls[[length(metrics.days.ls)+1]] <- list("SSPCA-BR-SPE"=do.call("rbind", lapply(sspca.spe.ls, function(x) x[[3]])), # SS PCA for BR
+                                                                            "SSPCA-MT-SPE"=do.call("rbind", lapply(sspca.spe.ls, function(x) x[[4]])), # SS PCA for MT
+                                                                            "SSPCA-BR-T2"=do.call("rbind", lapply(sspca.t2.ls, function(x) x[[3]])), # SS PCA for BR
+                                                                            "SSPCA-MT-T2"=do.call("rbind", lapply(sspca.t2.ls, function(x) x[[4]])), # SS PCA for MT
+                                                                            "SSPCA-BR-SPE-T2"=do.call("rbind", lapply(sspca.both.ls, function(x) x[[3]])), # SS PCA for BR
+                                                                            "SSPCA-MT-SPE-T2"=do.call("rbind", lapply(sspca.both.ls, function(x) x[[4]])), # SS PCA for MT
+                                                                            "MSADPCA-BR-SPE"=do.call("rbind", lapply(mspca.spe.ls, function(x) x[[3]])), # MS AD-PCA for BR
+                                                                            "MSADPCA-MT-SPE"=do.call("rbind", lapply(mspca.spe.ls, function(x) x[[4]])), # MS AD-PCA for MT
+                                                                            "MSADPCA-BR-T2"=do.call("rbind", lapply(mspca.t2.ls, function(x) x[[3]])), # MS AD-PCA for BR
+                                                                            "MSADPCA-MT-T2"=do.call("rbind", lapply(mspca.t2.ls, function(x) x[[4]])), # MS AD-PCA for MT
+                                                                            "MSADPCA-BR-SPE-T2"=do.call("rbind", lapply(mspca.both.ls, function(x) x[[3]])), # MS AD-PCA for BR
+                                                                            "MSADPCA-MT-SPE-T2"=do.call("rbind", lapply(mspca.both.ls, function(x) x[[4]])) # MS AD-PCA for MT
+    )
   }
   names(results.days.ls) <- paste(rollingWindowDays,"Days")
+  names(metrics.days.ls) <- paste(rollingWindowDays,"Days")
   
   save(results.days.ls, file=paste0("results/results-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent.RData"))
-  
+  save(metrics.days.ls, file=paste0("results/metrics-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent.RData"))
 }
 
 

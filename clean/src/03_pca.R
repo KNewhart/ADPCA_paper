@@ -129,6 +129,9 @@ adpca <- function(train.data,
   #     }
   #   }
   stopCluster(cl)
-  return(list(do.call("rbind", results.br.ls[which(unlist(lapply(results.br.ls, function(x) !anyNA(x))))]), 
-              do.call("rbind", results.mt.ls[which(unlist(lapply(results.mt.ls, function(x) !anyNA(x))))])))
+  return(list(do.call("rbind", results.br.ls[which(unlist(lapply(results.br.ls, function(x) !anyNA(x[[1]]))))]), 
+              do.call("rbind", results.mt.ls[which(unlist(lapply(results.mt.ls, function(x) !anyNA(x[[1]]))))]),
+              do.call("rbind", results.br.ls[which(unlist(lapply(results.br.ls, function(x) !anyNA(x[[2]]))))]), 
+              do.call("rbind", results.mt.ls[which(unlist(lapply(results.mt.ls, function(x) !anyNA(x[[2]]))))])
+              )) # Changed this to handle x as list with metric
 }

@@ -55,6 +55,7 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
   
   ### Calculate pca/spe/t2 on testing
   scaledTest.results <- matrix("IC", nrow=nrow(scaledTest), ncol = 3)
+  scaledTest.metrics <- matrix(NA, nrow=nrow(scaledTest), ncol = 4)
   colnames(scaledTest.results) <- c("SPE", "T2", "SPE-T2")
   for(row in 1:nrow(scaledTest)) {
     observation <- scaledTest[row,]
@@ -70,11 +71,18 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
     T2 <- diag(proj_observation %*% LambdaInv %*% t(proj_observation))
     if(T2>T2.np.lim) scaledTest.results[row, 2] <- "OC"
     if((T2>T2.np.lim) && (SPE>SPE.np.lim)) scaledTest.results[row, 3] <- "OC"
+    scaledTest.metrics[row,1] <- SPE
+    scaledTest.metrics[row,2] <- SPE.np.lim
+    scaledTest.metrics[row,3] <- T2
+    scaledTest.metrics[row,4] <- T2.np.lim
   }
   
   if(metric=="SPE") return.col <- 1
   if(metric=="T2") return.col <- 2
   if(metric=="SPE-T2") return.col <- 3
   
-  return(xts(scaledTest.results[,return.col], order.by = index(scaledTest)))
+  return.all <- list(xts(scaledTest.results[,return.col], order.by = index(scaledTest)),
+                     xts(scaledTest.metrics, order.by=index(scaledTest)))
+  
+  return(return.all) # Changed this to return a list with metric and threshold
 }
