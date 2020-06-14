@@ -20,14 +20,16 @@ timeframes <- c("2017-02-26/2017-04-03",
                 "2017-05-28/2017-07-20",
                 "2017-09-14/2018-02-28")
 
-# for(t in 1:length(timeframes)) {
-for(t in 2:length(timeframes)) {
+per.var <- 0.90
+
+for(t in 1:length(timeframes)) {
+# for(t in 2:length(timeframes)) {
   
   # Subset data to make more manageable
   allData <- rawData[timeframes[t]]
   # Remove dates when the system was shutdown
   allData <- allData[-unique(c(which(allData[,"MBR_1\\CURRENT_MODE"]==0),
-                               which(allData[,"MBR_1\\CURRENT_MODE"]==0))),]
+                               which(allData[,"MBR_2\\CURRENT_MODE"]==0))),] # changed for 90% var, need to rerun for 99% var
   dates.ch <- unique(substr(index(allData),1,10))
   
   
@@ -86,7 +88,7 @@ for(t in 2:length(timeframes)) {
                                                       dynamic=TRUE,
                                                       multistate=FALSE,
                                                       alpha=0.01,
-                                                      per.var=0.99,
+                                                      per.var=per.var,
                                                       metric="SPE")
       
       if(length(sspca.t2.ls)>0) { # Exclude OC obs from previous testing data
@@ -101,7 +103,7 @@ for(t in 2:length(timeframes)) {
                                                     dynamic=TRUE,
                                                     multistate=FALSE,
                                                     alpha=0.01,
-                                                    per.var=0.99,
+                                                    per.var=per.var,
                                                     metric="T2")
       
       if(length(sspca.both.ls)>0) { # Exclude OC obs from previous testing data
@@ -116,7 +118,7 @@ for(t in 2:length(timeframes)) {
                                                         dynamic=TRUE,
                                                         multistate=FALSE,
                                                         alpha=0.01,
-                                                        per.var=0.99,
+                                                        per.var=per.var,
                                                         metric="SPE-T2")
       
       # 4. MS ADPCA
@@ -136,7 +138,7 @@ for(t in 2:length(timeframes)) {
                                                       dynamic=TRUE,
                                                       multistate=TRUE,
                                                       alpha=0.01,
-                                                      per.var=0.99,
+                                                      per.var=per.var,
                                                       metric="SPE")
       
       if(length(mspca.t2.ls)>0) { # Exclude OC obs from previous testing data
@@ -151,7 +153,7 @@ for(t in 2:length(timeframes)) {
                                                     dynamic=TRUE,
                                                     multistate=TRUE,
                                                     alpha=0.01,
-                                                    per.var=0.99,
+                                                    per.var=per.var,
                                                     metric="T2")
       
       if(length(mspca.both.ls)>0) { # Exclude OC obs from previous testing data
@@ -166,7 +168,7 @@ for(t in 2:length(timeframes)) {
                                                         dynamic=TRUE,
                                                         multistate=TRUE,
                                                         alpha=0.01,
-                                                        per.var=0.99,
+                                                        per.var=per.var,
                                                         metric="SPE-T2")
     }
     # Combine results for all days tested
@@ -187,7 +189,7 @@ for(t in 2:length(timeframes)) {
   }
   names(results.days.ls) <- paste(rollingWindowDays,"Days")
   
-  save(results.days.ls, file=paste0("results/results-days-ls-",gsub("/"," ",timeframes[t]),".RData"))
+  save(results.days.ls, file=paste0("results/results-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent.RData"))
   
 }
 
