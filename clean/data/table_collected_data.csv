@@ -1,0 +1,45 @@
+#,Variable,State (S) or Process (P),SBR or MBR Subsystem
+1,Bioreactor 1 Phase,S,SBR
+2,Bioreactor 2 Phase,S,SBR
+3,Bioreactor Blower 1 Running,S,SBR
+4,Bioreactor Blower 2 Running,S,SBR
+5,MBR 1 Mode,S,MBR
+6,MBR 2 Mode,S,MBR
+7,MBR 1 & 2 Flux Mode,S,MBR
+8,MBR1 State,S,MBR
+9,MBR 2 State,S,MBR
+10,MBR 1 Air Scour Valve Position,S,MBR
+11,MBR 2 Air Scour Valve Position,S,MBR
+12,Bioreactor 1 Dissolved Oxygen,P,SBR
+13,Bioreactor 2 Dissolved Oxygen,P,SBR
+14,Bioreactor Blower 1 Flow,P,SBR
+15,Bioreactor Blower 2 Flow,P,SBR
+16,Sewage Flow,P,SBR
+17,Sewage Level,P,SBR
+18,Ambient Temperature,P,SBR/MBR
+19,Bioreactor 1 Level,P,SBR
+20,Bioreactor 1 Temperature,P,SBR
+21,Bioreactor 2 Level,P,SBR
+22,Bioreactor 2 Temperature,P,SBR
+23,RAS pH,P,SBR/MBR
+24,RAS Temperature,P,SBR/MBR
+25,RAS Total Suspended Solids,P,SBR/MBR
+26,MBR 1 Permeate Flow,P,MBR
+27,MBR 1 Permeate Pressure,P,MBR
+28,MBR 2 Permeate Flow,P,MBR
+29,MBR 2 Permeate Pressure,P,MBR
+30,MBR 1 Transmembrane Pressure,P,MBR
+31,MBR 2 Transmembrane Pressure,P,MBR
+32,MBR 1 Air Scour Flow,P,MBR
+33,MBR 2 Air Scour Flow,P,MBR
+34,MBR 1 Air Scour Pressure,P,MBR
+35,MBR 2 Air Scour Pressure,P,MBR
+36,MBR 1 Level,P,MBR
+37,MBR 2 Level,P,MBR
+38,MBR 1 Influent Flow,P,MBR
+39,MBR 2 Influent Flow,P,MBR
+40,MBR 1 Total Suspended Solids,P,MBR
+41,MBR 2 Total Suspended Solids,P,MBR
+42,Permeate Tank Conductivity,P,MBR
+43,Permeate Tank Level,P,MBR
+44,Permeate Tank Turbidity,P,MBR

@@ -1,4 +1,9 @@
-dataLocation <- "C:\\Users\\Kate Newhart\\Dropbox\\Data\\MP_SBMBR_data\\"
+# library(xts)
+
+# Rolling window sizes to test
+# rollingWindowDays <- c(3,5,7,9,11)
+
+# dataLocation <- "C:\\Users\\Kate Newhart\\Dropbox\\Data\\MP_SBMBR_data\\"
 # dataLocation <- "C:\\Users\\Kate Newhart\\Dropbox\\Newhart ADPCA Paper\\R\\clean\\data\\"
 
 stateVarsBR <- c("BIO_1\\CURRENT_PHASE",
