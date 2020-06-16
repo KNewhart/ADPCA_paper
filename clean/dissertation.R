@@ -1,5 +1,5 @@
 setwd("C:\\Users\\kbnewhart\\Dropbox\\Code\\Fault detection\\R\\clean")
-sapply(list.files(path="src", full.names=TRUE), source)
+sapply(list.files(path="src", full.names=TRUE, pattern = ".R"), source)
 
 ##### Load raw data #####
 library(xts)
@@ -18,12 +18,14 @@ rollingWindowDays <- seq(1,14,by=1)
 
 timeframes <- c("2017-02-26/2017-04-03",
                 "2017-05-28/2017-07-20",
-                "2017-09-14/2018-02-28")
+                "2017-09-14/2018-02-28",
+                "2018-05-01/2018-09-05",
+                "2019-07-01/2020-01-13")
 
-per.var <- 0.90
+per.var <- 0.99
 
 for(t in 1:length(timeframes)) {
-# for(t in 2:length(timeframes)) {
+# for(t in 3:length(timeframes)) {
   
   # Subset data to make more manageable
   allData <- rawData[timeframes[t]]
@@ -36,7 +38,7 @@ for(t in 1:length(timeframes)) {
   metrics.days.ls <- list()
   results.days.ls <- list()
   # For each rolling window...
-  for(days in rollingWindowDays) {
+  for(days in rollingWindowDays[11:14]) {
     # Setup results lists
     control.limit.ls <- list()
     control.chart.ls <- list()

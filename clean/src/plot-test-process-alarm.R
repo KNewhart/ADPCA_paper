@@ -1,10 +1,15 @@
-plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR", state="MS") {
+plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR", state="MS", multiple=TRUE, mfcol.c = c(length(col.n),1), legend.l=TRUE) {
   alarms.tot <- vector()
-    par(mfcol=c(length(col.n),1), mar=c(2.5,2.5,2,3.5))
+  colors.n <- c("#D81B60", "#1E88E5", "#D47D1B")
+    if(multiple) par(mfcol=mfcol.c, mar=c(2.5,2.5,2,3.5))
+  if(!multiple) par(mar=c(2.5,3.5,2,3.5))
     for(c in col.n) {
       
-      plot(as.zoo(allData[,c]), xlab="", ylab="", plot.type="single", pch=20, 
+      if(multiple) plot(as.zoo(allData[,c]), xlab="", ylab="", plot.type="single", pch=20, 
            type="p", main=colnames(allData)[c])
+      if(!multiple) plot(as.zoo(allData[,c]), xlab="", plot.type="single", pch=20, 
+                        type="p", ylab="")
+      if(!multiple) mtext(colnames(allData)[c], side=2, line=2.5, cex=.75)
       mtext("Training Days", side=4, line=2.5, cex=.75)
       # points(as.zoo(allData[,c][unique(as.POSIXct(alarms.tot, origin="1970-01-01"))]), col="red")
       # for(n in 0:length(results.days.ls)) {
@@ -15,7 +20,7 @@ plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR
       
       par(new=TRUE)
       plot(as.zoo(xts(rep(-1, nrow(allData)), order.by=index(allData))), 
-           ylim=c(1,14), axes=FALSE)
+           ylim=c(1,14), axes=FALSE, xlab="", ylab="")
       axis(side=4)
       abline(h=c(5,10), lty=2)
       
@@ -30,9 +35,10 @@ plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR
           alarms.diff <- c(alarms.diff, as.numeric(difftime(alarms[i], alarms[i-2], units = "min")))
         }
         alarms <- alarms[which(alarms.diff==2)+2]
-        points(as.zoo(xts(rep(day, length(alarms)), 
-                          order.by=alarms)), 
-               type="p", col="pink",  cex=1.25, pch=20)
+        alarms <- xts(rep(day, length(alarms)), 
+                      order.by=alarms)[paste(range(index(allData)), collapse ="/")]
+        points(as.zoo(alarms), 
+               type="p", col=colors.n[1],  cex=1.25, pch=20)
         
         alarms.tot <- c(alarms.tot, alarms)
       }
@@ -47,9 +53,10 @@ plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR
           alarms.diff <- c(alarms.diff, as.numeric(difftime(alarms[i], alarms[i-2], units = "min")))
         }
         alarms <- alarms[which(alarms.diff==2)+2]
-        points(as.zoo(xts(rep(day, length(alarms)), 
-                          order.by=alarms)), 
-               type="p", col="lightblue",  cex=1.25, pch=20)
+        alarms <- xts(rep(day, length(alarms)), 
+                      order.by=alarms)[paste(range(index(allData)), collapse ="/")]
+        points(as.zoo(alarms),  
+               type="p", col=colors.n[2],  cex=1.25, pch=20)
         
         alarms.tot <- c(alarms.tot, alarms)
       }
@@ -64,16 +71,17 @@ plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR
           alarms.diff <- c(alarms.diff, as.numeric(difftime(alarms[i], alarms[i-2], units = "min")))
         }
         alarms <- alarms[which(alarms.diff==2)+2]
-        points(as.zoo(xts(rep(day, length(alarms)), 
-                          order.by=alarms)), 
-               type="p", col="purple",  cex=1.25, pch=20)
+        alarms <- xts(rep(day, length(alarms)), 
+                      order.by=alarms)[paste(range(index(allData)), collapse ="/")]
+        points(as.zoo(alarms), 
+               type="p", col=colors.n[3],  cex=1.25, pch=20)
         
         alarms.tot <- c(alarms.tot, alarms)
       }
       
     }
     
-    legend("bottomright", legend=c("SPE", "T2", "SPE-T2"), col=c("pink", "lightblue", "purple"),
+    if(legend.l) legend("bottomright", legend=c("SPE", "T2", "SPE-T2"), col=c(colors.n[1], colors.n[2], colors.n[3]),
            pch=20, pt.cex=1.25)
     
 }
