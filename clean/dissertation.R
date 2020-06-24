@@ -1,6 +1,11 @@
 setwd("C:\\Users\\kbnewhart\\Dropbox\\Code\\Fault detection\\R\\clean")
 sapply(list.files(path="src", full.names=TRUE, pattern = ".R"), source)
 
+# old.files <- list.files("results", full.names = TRUE)[grep("percent.RData", list.files("results"))]
+# new.files <- unlist(lapply(strsplit(old.files, ".RData"), function(x) paste0(x," 1alpha.RData")))
+# file.copy(from = old.files, to = new.files)
+# file.remove(old.files)
+
 ##### Load raw data #####
 library(xts)
 if(!("rawData.RData" %in% list.files("results"))) {
@@ -20,12 +25,17 @@ timeframes <- c("2017-02-26/2017-04-03",
                 "2017-05-28/2017-07-20",
                 "2017-09-14/2018-02-28",
                 "2018-05-01/2018-09-05",
-                "2019-07-01/2020-01-13")
+                "2019-07-01/2020-01-13"
+)
 
-per.var <- 0.99
+for(per.var in c(0.99, 0.9, 0.8)) {
+for(alpha in c(0.01, 0.10)) {
+
 
 for(t in 1:length(timeframes)) {
 # for(t in 3:length(timeframes)) {
+  filename <- paste0("results/metrics-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent ",round(alpha*100,0),"alpha.RData")
+  if((filename %in% list.files("results", full.names = TRUE))) next
   
   # Subset data to make more manageable
   allData <- rawData[timeframes[t]]
@@ -38,7 +48,7 @@ for(t in 1:length(timeframes)) {
   metrics.days.ls <- list()
   results.days.ls <- list()
   # For each rolling window...
-  for(days in rollingWindowDays[11:14]) {
+  for(days in rollingWindowDays) {
     # Setup results lists
     control.limit.ls <- list()
     control.chart.ls <- list()
@@ -56,6 +66,7 @@ for(t in 1:length(timeframes)) {
       date <- as.Date(dates.ch[date.n])
       train <- allData[paste(date, date+days-1, sep="/")]
       test <- allData[paste(date+days)]
+      if(length(test)== 0) next
       control.limit.ls[[length(control.limit.ls)+1]] <- control.limits(test.data=test)
       
       # 2. Control charts
@@ -89,7 +100,7 @@ for(t in 1:length(timeframes)) {
                                                       test.data=test,
                                                       dynamic=TRUE,
                                                       multistate=FALSE,
-                                                      alpha=0.01,
+                                                      alpha=alpha,
                                                       per.var=per.var,
                                                       metric="SPE")
       
@@ -104,7 +115,7 @@ for(t in 1:length(timeframes)) {
                                                     test.data=test,
                                                     dynamic=TRUE,
                                                     multistate=FALSE,
-                                                    alpha=0.01,
+                                                    alpha=alpha,
                                                     per.var=per.var,
                                                     metric="T2")
       
@@ -119,7 +130,7 @@ for(t in 1:length(timeframes)) {
                                                         test.data=test,
                                                         dynamic=TRUE,
                                                         multistate=FALSE,
-                                                        alpha=0.01,
+                                                        alpha=alpha,
                                                         per.var=per.var,
                                                         metric="SPE-T2")
       
@@ -139,7 +150,7 @@ for(t in 1:length(timeframes)) {
                                                       test.data=test,
                                                       dynamic=TRUE,
                                                       multistate=TRUE,
-                                                      alpha=0.01,
+                                                      alpha=alpha,
                                                       per.var=per.var,
                                                       metric="SPE")
       
@@ -154,7 +165,7 @@ for(t in 1:length(timeframes)) {
                                                     test.data=test,
                                                     dynamic=TRUE,
                                                     multistate=TRUE,
-                                                    alpha=0.01,
+                                                    alpha=alpha,
                                                     per.var=per.var,
                                                     metric="T2")
       
@@ -169,7 +180,7 @@ for(t in 1:length(timeframes)) {
                                                         test.data=test,
                                                         dynamic=TRUE,
                                                         multistate=TRUE,
-                                                        alpha=0.01,
+                                                        alpha=alpha,
                                                         per.var=per.var,
                                                         metric="SPE-T2")
     }
@@ -207,8 +218,10 @@ for(t in 1:length(timeframes)) {
   names(results.days.ls) <- paste(rollingWindowDays,"Days")
   names(metrics.days.ls) <- paste(rollingWindowDays,"Days")
   
-  save(results.days.ls, file=paste0("results/results-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent.RData"))
-  save(metrics.days.ls, file=paste0("results/metrics-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent.RData"))
+  save(results.days.ls, file=paste0("results/results-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent ",round(alpha*100,0),"alpha.RData"))
+  save(metrics.days.ls, file=paste0("results/metrics-days-ls-",gsub("/"," ",timeframes[t])," ",round(per.var*100,0),"percent ",round(alpha*100,0),"alpha.RData"))
 }
 
-
+}
+  
+}
