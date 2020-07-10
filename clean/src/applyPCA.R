@@ -82,7 +82,7 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
     # Hotelling's T^2 monitoring statistic
     T2 <- diag(proj_observation %*% LambdaInv %*% t(proj_observation))
     if(T2>T2.np.lim) scaledTest.results[row, 2] <- "OC"
-    if((T2>T2.np.lim) && (SPE>SPE.np.lim)) scaledTest.results[row, 3] <- "OC"
+    if((T2>T2.np.lim) || (SPE>SPE.np.lim)) scaledTest.results[row, 3] <- "OC"
     scaledTest.metrics[row,1] <- SPE
     scaledTest.metrics[row,2] <- SPE.np.lim
     scaledTest.metrics[row,3] <- T2
