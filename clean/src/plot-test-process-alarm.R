@@ -1,10 +1,11 @@
-plot.test.process.alarms <- function(allData, col.n, results.days.ls, subsys="BR", state="MS", multiple=TRUE, mfcol.c = c(length(col.n),1), legend.l=TRUE) {
+plot.test.process.alarms <- function(allData, col.n=1:ncol(allData), results.days.ls, 
+                                     subsys="BR", state="MS", multiple=TRUE, 
+                                     mfcol.c = c(length(col.n),1), legend.l=TRUE) {
   alarms.tot <- vector()
   colors.n <- c("#D81B60", "#1E88E5", "#D47D1B")
-    if(multiple) par(mfcol=mfcol.c, mar=c(2.5,2.5,2,3.5))
-  if(!multiple) par(mar=c(2.5,3.5,2,3.5))
-    for(c in col.n) {
-      
+  if(multiple) par(mfcol=mfcol.c, mar=c(2.5,2.5,2,3.5))
+  if(!multiple) par(mar=c(2.5,3.5,2,5))
+  for(c in col.n) {
       if(multiple) plot(as.zoo(allData[,c]), xlab="", ylab="", plot.type="single", pch=20, 
            type="p", main=colnames(allData)[c])
       if(!multiple) plot(as.zoo(allData[,c]), xlab="", plot.type="single", pch=20, 

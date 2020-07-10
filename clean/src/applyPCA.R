@@ -29,7 +29,7 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
   R <- cor(scaledtrain.data, use = "pairwise.complete.obs")
   eigenR <- eigen(R)
   evalR <- eigenR$values
-  evecR <- eigenR$vectors
+  evecR <- eigenR$vectors # loads
   
   prop.var <- as.matrix(cumsum(evalR) / sum(evalR) * 100)
   comps <- last(which(prop.var - (per.var * 100) < 0))
@@ -41,7 +41,7 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
   # Reduced Matrix in Original Space
   X.hat <- PCs %*% t(P)
   # Residual Matrix
-  E <- scaledtrain.data - X.hat
+  E <- scaledtrain.data - X.hat # X squiggle
   # Squared prediction error monitoring statistic
   SPEs <- diag(E %*% t(E))
   # Hotelling's T^2 monitoring statistic
@@ -52,6 +52,18 @@ applyPCA <- function(train.data, test.data, per.var, metric, alpha) {
   SPE.np.lim <- BMS::quantile.density(SPE.np.d, 1 - alpha)
   T2.np.d <- density(T2s, bw = "SJ", kernel = "gaussian", from = 0)
   T2.np.lim <- BMS::quantile.density(T2.np.d, 1 - alpha)
+  
+  # l <- comps
+  # theta1 <- sum(evalR[(l+1):ncol(scaledTest)])
+  # theta2 <- sum(evalR[(l+1):ncol(scaledTest)]^2)
+  # g.SPE <- theta2/theta1
+  # h.SPE <- theta1^2/theta2
+  # delta <- (g.SPE*qchisq(1 - alpha, df=h.SPE))^0.5
+  # tao <- (qchisq(1 - alpha, df=comps))^0.5
+  # phi <- SPEs/(delta^2)+T2s/(tao^2)
+  # g.phi <- (1/(tao^4)+theta2/(delta^4))/(1/(tao^2)+theta1/(delta^2))
+  # h.phi <- (1/(tao^2)+theta1/(delta^2))^2/(1/(tao^4)+theta2/(delta^4))
+  # zeta <- (g.phi*qchisq(1-alpha, df=h.phi) )^0.5
   
   ### Calculate pca/spe/t2 on testing
   scaledTest.results <- matrix("IC", nrow=nrow(scaledTest), ncol = 3)
